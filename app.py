@@ -236,7 +236,7 @@ COLNAME_CANDIDATES_CUSTOM_CSV_FIX = {
     "trial_id_col_name_fix": ["trial_id", "trialid", "trial", "trial_num", "id"],
     "subject_col_name_fix": ["subject", "sub", "subid", "sub_id"],
     "time_start_col_name_fix": ["start", "start_time", "ts", "t_start", "starttime"],
-    "time_stop_col_name_fix": ["stop", "stop_time", "te", "t_end", "t_stop", "stoptime"],
+    "time_stop_col_name_fix": ["end","stop", "stop_time", "te", "t_end", "t_stop", "stoptime"],
 }
 COLNAME_CANDIDATES_CUSTOM_CSV_FIX_DEFAULT = {k: v[0] for k, v in COLNAME_CANDIDATES_CUSTOM_CSV_FIX.items()}
 
@@ -1072,20 +1072,25 @@ def get_fixations_file_trials_list(dffix, stimulus):
 
     return trials_by_ids, trial_keys
 
+def make_ints_float(df):
+    for col in df.columns:
+        if 'int' in str(df[col].dtype).lower():
+            df[col] = pd.to_numeric(df[col], downcast='float') 
+    return df
 
 def load_csv_delim_agnostic(file_path):
     try:
         df = pd.read_csv(file_path)
         if df.shape[1] > 1:
-            return df
+            return make_ints_float(df)
         else:
             dec_file = get_decoded_input_from_file(file_path)
             df = pd.read_csv(StringIO(dec_file.replace(";", ",").replace("\t", ",")))
-            return df
+            return make_ints_float(df)
     except Exception as e:
         dec_file = get_decoded_input_from_file(file_path)
         df = pd.read_csv(StringIO(dec_file.replace(";", ",").replace("\t", ",")))
-        return df
+        return make_ints_float(df)
 
 
 def find_col_name_suggestions(cols, candidates_dict):
