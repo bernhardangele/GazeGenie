@@ -238,9 +238,9 @@ def add_words(chars_list):
             word_ymin = chars_list_reconstructed[word_start_idx]["char_ymin"]
             word_ymax = chars_list_reconstructed[word_start_idx]["char_ymax"]
             word_x_center = round((word_xmax - word_xmin) / 2 + word_xmin, ndigits=2)
-            word_y_center = round((word_ymax - word_ymin) / 2 + word_ymin, ndigits=2)
+            word_y_center = chars_list_reconstructed[word_start_idx]["char_y_center"]
             word_length = len(word)
-            assigned_line = chars_list_reconstructed[word_start_idx]["assigned_line"]
+            assigned_line = int(chars_list_reconstructed[word_start_idx]["assigned_line"])
             word_dict = dict(
                 word_number=len(words_list),
                 word=word,
