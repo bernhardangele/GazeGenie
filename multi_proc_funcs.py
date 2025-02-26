@@ -1992,8 +1992,12 @@ def add_popEye_cols_to_dffix(dffix, algo_choice, chars_df, trial, xcol, cols_to_
             ].reset_index()
             selected_stimmat.loc[:, "letword"] = selected_stimmat.groupby("in_word_number")["letternum"].rank()
             letters_on_line = selected_stimmat.shape[0]
-            out = dffix.loc[i, xcol] - selected_stimmat["char_x_center"]
-            min_idx = out.abs().idxmin()
+            if len(selected_stimmat["char_x_center"])>0:
+                out = dffix.loc[i, xcol] - selected_stimmat["char_x_center"]
+                min_idx = out.abs().idxmin()
+                # ic(selected_stimmat)
+            else:
+                min_idx = 0
             dffix.loc[i, f"letternum_{algo_choice}"] = selected_stimmat.loc[min_idx, "letternum"]
             dffix.loc[i, f"letter_{algo_choice}"] = selected_stimmat.loc[min_idx, "char"]
             dffix.loc[i, f"line_let_{algo_choice}"] = selected_stimmat.loc[min_idx, "letline"]
