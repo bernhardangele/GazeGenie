@@ -16,6 +16,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Rectangle
 from tqdm.auto import tqdm
 import torch as t
+t.classes.__path__ = [] # https://discuss.streamlit.io/t/error-in-torch-with-streamlit/90908/3
 import plotly.express as px
 import copy
 

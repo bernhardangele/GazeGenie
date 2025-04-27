@@ -17,7 +17,6 @@ MEASURES_DICT = {
     "second_pass_duration": [],
     "initial_landing_position": [],
     "initial_landing_distance": [],
-    "landing_distances": [],
     "number_of_regressions_in": [],
 }
 

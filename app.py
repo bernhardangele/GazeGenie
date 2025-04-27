@@ -21,6 +21,12 @@ import eyekit_measures as ekm
 import zipfile
 from matplotlib import font_manager
 import os
+LOGDIR = "logs"
+pl.Path(LOGDIR).mkdir(exist_ok=True)
+try:
+    from create_interest_areas_from_image import recognize_text
+except Exception as e:
+    print(e)
 
 from multi_proc_funcs import (
     ALL_FIX_MEASURES,
@@ -317,7 +323,7 @@ def create_logger(name, level="DEBUG", file=None):
 
 
 if "logger" not in st.session_state:
-    st.session_state["logger"] = create_logger(name="app", level="DEBUG", file="log_for_app.log")
+    st.session_state["logger"] = create_logger(name="app", level="DEBUG", file=f"{LOGDIR}/log_for_app.log")
 
 
 def add_fonts(font_dirs=["fonts"]):
@@ -923,6 +929,8 @@ def make_trial_from_stimulus_df(
     stim_plot_df,
     filename,
     trial_id,
+    close_gaps_between_words:bool,
+    close_gaps_between_lines:bool,
 ):
     chars_list = []
     words_list = []
@@ -931,6 +939,12 @@ def make_trial_from_stimulus_df(
         chars_list.append(char_dict)
 
     words_list, chars_list = ut.add_words(chars_list)
+    if close_gaps_between_words:
+        words_list = ut.close_gaps_in_words_list(words_list)
+    if close_gaps_between_lines:
+        chars_list = ut.close_gaps_between_lines(chars_list,prefix='char') 
+        words_list = ut.close_gaps_between_lines(words_list,prefix='word') 
+
     letter_width_avg = np.mean([x["char_xmax"] - x["char_xmin"] for x in chars_list if x["char_xmax"] > x["char_xmin"]])
     line_heights = [x["char_ymax"] - x["char_ymin"] for x in chars_list]
     line_xcoords_all = [x["char_x_center"] for x in chars_list]
@@ -1034,12 +1048,15 @@ def get_fixations_file_trials_list(dffix, stimulus):
     for trial_id, subdf in stqdm(enum, desc="Creating trials"):
         if isinstance(stimulus, pd.DataFrame):
             stim_df = stimulus[stimulus.trial_id == subdf["trial_id"].iloc[0]]
+            if stim_df.empty:
+                st.session_state["logger"].warning(f"stim_df dataframe is empty because trial_id {trial_id} not in stimulus trial ids:\n{stimulus.trial_id.unique()}")
 
             stim_df = stim_df.dropna(axis=0, how="all")
             subdf = subdf.dropna(axis=0, how="all")
             stim_df = stim_df.dropna(axis=1, how="all")
             subdf = subdf.dropna(axis=1, how="all")
             if subdf.empty:
+                st.session_state["logger"].warning(f"Sub dataframe is empty for trial_id {trial_id}")
                 continue
             subdf = subdf.reset_index(drop=True).copy()
             stim_df = stim_df.reset_index(drop=True).copy()
@@ -1048,6 +1065,8 @@ def get_fixations_file_trials_list(dffix, stimulus):
                 stim_df,
                 st.session_state["single_csv_file_stim"].name,
                 trial_id,
+                close_gaps_between_words=st.session_state["close_gap_between_words_single_csv"],
+                close_gaps_between_lines=st.session_state["close_gap_between_lines_single_csv"],
             )
         else:
             if "trial_id" in stimulus.keys() and (
@@ -1379,6 +1398,7 @@ def main():
             trial_choices_single_asc, trials_by_ids, lines, asc_file, trials_dict = ut.get_trials_list(
                 st.session_state["single_asc_file_asc"],
                 close_gap_between_words=st.session_state["close_gap_between_words_single_asc"],
+                close_gap_between_lines=st.session_state["close_gap_between_lines_single_asc"],
                 paragraph_trials_only=st.session_state["paragraph_trials_only_single_asc"],
                 ias_files=st.session_state["single_asc_file_ias_files"],
                 trial_start_keyword=trial_start_keyword,
@@ -1986,10 +2006,22 @@ def main():
             "Select .csv or .json file containing the stimulus data",
             accept_multiple_files=False,
             key="single_csv_file_stim_uploaded",
-            type={"json", "csv", "txt", "dat"},
-            help="Drag and drop or select a single .json, .csv, .txt or .dat file that you wish to process as the stimulus file for the uploaded fixation data. This can be left blank if you chose to use the examples.",
+            type={"json", "csv", "txt", "dat","jpeg","png"},
+            help="Drag and drop or select a single .json, .csv, .txt, .dat, jpeg or png file that you wish to process as the stimulus file for the uploaded fixation data. If an image is uploaded OCR will be attempted to extract the character bounding boxes. This can be left blank if you chose to use the examples.",
         )
 
+        st.checkbox(
+            label="Should spaces between words be included in word bounding box?",
+            value=get_default_val("close_gap_between_words_csv", True),
+            key="close_gap_between_words_single_csv",
+            help="If this is selected, each word bounding box will include half the spaces between adjacent words. If not, the word bounding boxes will simply be the combined bounding boxes of the letters making up the word.",  # TODO check if this affects analysis
+        )
+        st.checkbox(
+            label="Should spaces between lines be included in word and character bounding boxes?",
+            value=get_default_val("close_gap_between_lines_single_csv", True),
+            key="close_gap_between_lines_single_csv",
+            help="If this is selected, each word and char bounding box will include half the spaces between adjacent lines.",  # TODO check if this affects analysis
+        )
         use_example_or_uploaded_file_choice = st.radio(
             "Should the uploaded files be used or some example files?",
             index=1,
@@ -2029,6 +2061,11 @@ def main():
                 trial = json.loads(decoded_input)
                 st.session_state["stimdf_single_csv"] = trial
                 colnames_stim = list(st.session_state["stimdf_single_csv"].keys())
+            elif any([".png" in single_csv_stim_file.name, ".jpeg" in single_csv_stim_file.name]):
+                stimdf_single_csv = recognize_text(single_csv_stim_file)
+                stimdf_single_csv.to_csv(RESULTS_FOLDER / f"{single_csv_stim_file.name}_stimdf_single_from_OCR.csv")
+                st.session_state["stimdf_single_csv"] = stimdf_single_csv
+                colnames_stim = st.session_state["stimdf_single_csv"].columns
             else:
                 st.session_state["stimdf_single_csv"] = load_csv_delim_agnostic(single_csv_stim_file)
                 colnames_stim = st.session_state["stimdf_single_csv"].columns
@@ -2412,6 +2449,7 @@ def main():
                     use_corrected_fixations=True,
                     correction_algo=st.session_state["algo_choice_custom_eyekit"],
                     save_to_csv=True,
+                    measures_to_calculate = ALL_MEASURES_OWN
                 )
                 st.dataframe(own_word_measures, use_container_width=True, hide_index=True, height=200)
                 own_word_measures_csv = convert_df(own_word_measures)
@@ -3061,6 +3099,7 @@ def main():
                             use_corrected_fixations=True,
                             correction_algo=st.session_state["algo_choice_multi_asc_eyekit"],
                             save_to_csv=True,
+                            measures_to_calculate = ALL_MEASURES_OWN
                         )
                     if "sentence_measures_multi_asc" in st.session_state:
                         sent_measures_multi = st.session_state["sentence_measures_multi_asc"]
@@ -3223,6 +3262,12 @@ def show_file_parsing_settings(suffix: str):
         value=get_default_val(f"close_gap_between_words{suffix}", True),
         key=f"close_gap_between_words{suffix}",
         help="If this is selected, each word bounding box will include half the spaces between adjacent words. If not, the word bounding boxes will simply be the combined bounding boxes of the letters making up the word.",  # TODO check if this affects analysis
+    )
+    st.checkbox(
+        label="Should spaces between lines be included in word and character bounding boxes?",
+        value=get_default_val(f"close_gap_between_lines{suffix}", True),
+        key=f"close_gap_between_lines{suffix}",
+        help="If this is selected, each word and char bounding box will include half the spaces between adjacent lines.",  # TODO check if this affects analysis
     )
     st.markdown("### Trial filtering settings")
 

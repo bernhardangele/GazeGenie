@@ -8,14 +8,11 @@ COPY . .
 RUN mkdir ./results
 
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    software-properties-common \
-    git \
-    libcairo2-dev pkg-config python3-dev \
+    build-essential curl software-properties-common git libcairo2-dev pkg-config python3-dev tesseract-ocr \
+    && apt-get -y install tesseract-ocr-spa \ 
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cpu
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 EXPOSE 8501

@@ -1,6 +1,7 @@
 import pickle
 from io import StringIO
 import re
+from typing import Dict, List
 import zipfile
 import os
 import plotly.graph_objects as go
@@ -17,6 +18,8 @@ from tqdm.auto import tqdm
 import time
 import requests
 from icecream import ic
+import collections
+import statistics
 from matplotlib import font_manager
 from multi_proc_funcs import (
     COLORS,
@@ -99,13 +102,14 @@ def download_url(url, target_filename):
 
 
 def asc_to_trial_ids(
-    asc_file, close_gap_between_words, paragraph_trials_only, ias_files, trial_start_keyword, end_trial_at_keyword
+    asc_file, close_gap_between_words,close_gap_between_lines, paragraph_trials_only, ias_files, trial_start_keyword, end_trial_at_keyword
 ):
     asc_encoding = ["ISO-8859-15", "UTF-8"][0]
     trials_dict, lines = file_to_trials_and_lines(
         asc_file,
         asc_encoding,
         close_gap_between_words=close_gap_between_words,
+        close_gap_between_lines=close_gap_between_lines,
         paragraph_trials_only=paragraph_trials_only,
         uploaded_ias_files=ias_files,
         trial_start_keyword=trial_start_keyword,
@@ -122,7 +126,7 @@ def asc_to_trial_ids(
 
 
 def get_trials_list(
-    asc_file, close_gap_between_words, paragraph_trials_only, ias_files, trial_start_keyword, end_trial_at_keyword
+    asc_file, close_gap_between_words,close_gap_between_lines, paragraph_trials_only, ias_files, trial_start_keyword, end_trial_at_keyword
 ):
     if hasattr(asc_file, "name"):
         savename = pl.Path(asc_file.name).stem
@@ -132,6 +136,7 @@ def get_trials_list(
     trials_by_ids, lines, trials_dict = asc_to_trial_ids(
         asc_file,
         close_gap_between_words=close_gap_between_words,
+        close_gap_between_lines=close_gap_between_lines,
         paragraph_trials_only=paragraph_trials_only,
         ias_files=ias_files,
         trial_start_keyword=trial_start_keyword,
@@ -473,6 +478,7 @@ def asc_lines_to_trials_by_trail_id(
     paragraph_trials_only=True,
     filename: str = "",
     close_gap_between_words=True,
+    close_gap_between_lines=True,
     ias_files=[],
     start_trial_at_keyword="START",
     end_trial_at_keyword="END",
@@ -884,21 +890,189 @@ def asc_lines_to_trials_by_trail_id(
             words_list = words_list_from_func
 
             if close_gap_between_words:  # TODO this may need to change the "in_word" col for the chars_df
-                for widx in range(1, len(words_list)):
-                    if words_list[widx]["assigned_line"] == words_list[widx - 1]["assigned_line"]:
-                        word_sep_half_width = (words_list[widx]["word_xmin"] - words_list[widx - 1]["word_xmax"]) / 2
-                        words_list[widx - 1]["word_xmax"] = words_list[widx - 1]["word_xmax"] + word_sep_half_width
-                        words_list[widx]["word_xmin"] = words_list[widx]["word_xmin"] - word_sep_half_width
+                words_list = close_gaps_in_words_list(words_list)
             else:
                 chars_df = pd.DataFrame(chars_list_reconstructed)
                 chars_df.loc[
                     chars_df["char"] == " ", ["in_word", "in_word_number", "num_letters_from_start_of_word"]
                 ] = pd.NA
                 chars_list_reconstructed = chars_df.to_dict("records")
+            if close_gap_between_lines:
+                chars_list_reconstructed = close_gaps_between_lines(chars_list_reconstructed,prefix='char')
+                words_list = close_gaps_between_lines(words_list,prefix='word')
             trials_dict[trial_idx]["words_list"] = words_list
             trials_dict[trial_idx]["chars_list"] = chars_list_reconstructed
     return trials_dict
 
+def close_gaps_between_lines(data, prefix):
+    """
+    Adjusts word_ymin and word_ymax for lines in a list of dictionaries based on average y-centers.
+
+    Args:
+        data: A list of dictionaries, where each dictionary must have
+            'assigned_line', 'word_ymin', and 'word_ymax' keys.
+
+    Returns:
+        A new list of dictionaries with adjusted 'word_ymin' and 'word_ymax' values.
+        Returns an empty list if the input is empty.
+        Returns the original list if there's only one unique line number.
+    """
+    if not data:
+        return []
+
+    # --- Step 1: Calculate ycenter and group by assigned_line ---
+    line_centers = collections.defaultdict(list)
+    # Keep track of original min/max for single line case plotting
+    original_coords = collections.defaultdict(
+        lambda: {f"{prefix}_ymin": float("inf"), f"{prefix}_ymax": float("-inf")}
+    )
+
+    for item in data:
+        if f"{prefix}_ymin" in item and f"{prefix}_ymax" in item:
+            ycenter = (item[f"{prefix}_ymin"] + item[f"{prefix}_ymax"]) / 2
+            line_num = item["assigned_line"]
+            line_centers[line_num].append(ycenter)
+            # Track overall min/max for original data per line
+            original_coords[line_num][f"{prefix}_ymin"] = min(
+                original_coords[line_num][f"{prefix}_ymin"], item[f"{prefix}_ymin"]
+            )
+            original_coords[line_num][f"{prefix}_ymax"] = max(
+                original_coords[line_num][f"{prefix}_ymax"], item[f"{prefix}_ymax"]
+            )
+
+    # --- Step 2: Calculate average ycenter for each assigned_line ---
+    avg_centers = {}
+    for line_num, centers in line_centers.items():
+        if centers:  # Avoid division by zero if a assigned_line had no valid entries
+            avg_centers[line_num] = statistics.mean(centers)
+
+    # Handle case with 0 or 1 unique line numbers - no adjustments needed/possible
+    if len(avg_centers) <= 1:
+        print(
+            "Only one unique line number found or no valid lines. No adjustments made."
+        )
+        # Return a deep copy to avoid modifying the original list if needed,
+        # or just return the original list. Let's return a copy for safety.
+        return data
+
+    # --- Step 3: Sort line numbers based on average ycenter ---
+    # Creates a list of tuples: (assigned_line, avg_ycenter) sorted by avg_ycenter
+    sorted_lines = sorted(avg_centers.items(), key=lambda item: item[1])
+    # Extract sorted line numbers and their average centers
+    sorted_line_nums = [item[0] for item in sorted_lines]
+    sorted_avg_centers = [item[1] for item in sorted_lines]
+
+    # --- Step 4: Calculate boundaries ---
+    num_lines = len(sorted_avg_centers)
+    boundaries = {}  # Store boundaries between line i and line i+1
+
+    # Calculate boundaries between adjacent lines
+    for i in range(num_lines - 1):
+        midpoint = (sorted_avg_centers[i] + sorted_avg_centers[i + 1]) / 2
+        boundaries[i] = midpoint
+
+    # --- Step 5: Determine new word_ymin and word_ymax for each assigned_line ---
+    new_coords = {}  # Stores {assigned_line: {'word_ymin': new_ymin, 'word_ymax': new_ymax}}
+
+    # Handle the first line
+    first_line_num = sorted_line_nums[0]
+    # Estimate boundary before the first line by extrapolating
+    # Use max(0, ...) to prevent negative word_ymin if lines are very close to 0
+    # Ensure extrapolation doesn't create negative boundary if first line is near 0
+    extrapolated_start_boundary = max(
+        0, sorted_avg_centers[0] - (sorted_avg_centers[1] - sorted_avg_centers[0]) / 2
+    )
+    # The new word_ymin should start 1 pixel *after* the rounded boundary
+    # The boundary itself is the dividing line.
+    new_ymin_first = round(extrapolated_start_boundary) + 1
+    new_ymax_first = round(boundaries[0])
+    # Ensure word_ymin is not greater than word_ymax, adjust if necessary
+    if new_ymin_first > new_ymax_first:
+        print(
+            f"Warning: Calculated word_ymin ({new_ymin_first}) > word_ymax ({new_ymax_first}) for first line ({first_line_num}). Adjusting word_ymin."
+        )
+        new_ymin_first = new_ymax_first  # Set word_ymin = word_ymax, resulting in a height of 0
+    new_coords[first_line_num] = {f"{prefix}_ymin": new_ymin_first, f"{prefix}_ymax": new_ymax_first}
+
+    # Handle intermediate lines
+    for i in range(1, num_lines - 1):
+        line_num = sorted_line_nums[i]
+        # word_ymin starts 1 pixel after the previous boundary
+        new_ymin = round(boundaries[i - 1]) + 1
+        # word_ymax is at the current boundary
+        new_ymax = round(boundaries[i])
+        # Ensure word_ymin is not greater than word_ymax
+        if new_ymin > new_ymax:
+            print(
+                f"Warning: Calculated word_ymin ({new_ymin}) > word_ymax ({new_ymax}) for intermediate line ({line_num}). Adjusting word_ymin."
+            )
+            new_ymin = new_ymax  # Adjust word_ymin to be equal to word_ymax
+        new_coords[line_num] = {f"{prefix}_ymin": new_ymin, f"{prefix}_ymax": new_ymax}
+
+    # Handle the last line
+    last_line_num = sorted_line_nums[-1]
+    # Estimate boundary after the last line by extrapolating
+    extrapolated_end_boundary = (
+        sorted_avg_centers[-1] + (sorted_avg_centers[-1] - sorted_avg_centers[-2]) / 2
+    )
+    # word_ymin starts 1 pixel after the previous boundary
+    new_ymin_last = round(boundaries[num_lines - 2]) + 1
+    # word_ymax is at the extrapolated end boundary
+    new_ymax_last = round(extrapolated_end_boundary)
+    # Ensure word_ymin is not greater than word_ymax
+    if new_ymin_last > new_ymax_last:
+        print(
+            f"Warning: Calculated word_ymin ({new_ymin_last}) > word_ymax ({new_ymax_last}) for last line ({last_line_num}). Adjusting word_ymax."
+        )
+        new_ymax_last = new_ymin_last  # Adjust word_ymax to be equal to word_ymin
+    new_coords[last_line_num] = {f"{prefix}_ymin": new_ymin_last, f"{prefix}_ymax": new_ymax_last}
+
+    # --- Step 6: Update the original data structure ---
+    # Create a new list to store results, preserving other keys
+    adjusted_data = []
+    for item in data:
+        new_item = (
+            item.copy()
+        )  # Create a copy to avoid modifying original dicts directly if they are reused
+        line_num = new_item.get("assigned_line")
+        if line_num in new_coords:
+            new_item[f"{prefix}_ymin"] = new_coords[line_num][f"{prefix}_ymin"]
+            new_item[f"{prefix}_ymax"] = new_coords[line_num][f"{prefix}_ymax"]
+        adjusted_data.append(new_item)
+
+    return adjusted_data
+
+def close_gaps_in_words_list(words_list:List[Dict]):
+    """
+    Adjusts the positions of words in a list to close gaps between consecutive words
+    that belong to the same assigned line. The function modifies the input list in place.
+
+    Args:
+        words_list (list of dict): A list of dictionaries where each dictionary represents
+            a word with the following keys:
+            - "assigned_line" (int): The line number to which the word is assigned.
+            - "word_xmin" (float): The minimum x-coordinate of the word's bounding box.
+            - "word_xmax" (float): The maximum x-coordinate of the word's bounding box.
+
+    Behavior:
+        - For each pair of consecutive words in the list that belong to the same line
+          (i.e., have the same "assigned_line"), the function calculates the gap between
+          their bounding boxes.
+        - The gap is split equally between the two words, and their "word_xmin" and
+          "word_xmax" values are adjusted accordingly to close the gap.
+
+    Note:
+        - The input list is modified in place, and no value is returned.
+        - It is assumed that the input list is sorted by "assigned_line" and the x-coordinates
+          of the words.
+
+    """
+    for widx in range(1, len(words_list)):
+        if words_list[widx]["assigned_line"] == words_list[widx - 1]["assigned_line"]:
+            word_sep_half_width = (words_list[widx]["word_xmin"] - words_list[widx - 1]["word_xmax"]) / 2
+            words_list[widx - 1]["word_xmax"] = words_list[widx - 1]["word_xmax"] + word_sep_half_width
+            words_list[widx]["word_xmin"] = words_list[widx]["word_xmin"] - word_sep_half_width
+    return words_list
 
 def get_lines_from_file(uploaded_file, asc_encoding="ISO-8859-15"):
     if isinstance(uploaded_file, str) or isinstance(uploaded_file, pl.Path):
@@ -915,6 +1089,7 @@ def file_to_trials_and_lines(
     uploaded_file,
     asc_encoding: str = "ISO-8859-15",
     close_gap_between_words=True,
+    close_gap_between_lines=True,
     paragraph_trials_only=True,
     uploaded_ias_files=[],
     trial_start_keyword="START",
@@ -926,6 +1101,7 @@ def file_to_trials_and_lines(
         paragraph_trials_only,
         uploaded_file,
         close_gap_between_words=close_gap_between_words,
+        close_gap_between_lines=close_gap_between_lines,
         ias_files=uploaded_ias_files,
         start_trial_at_keyword=trial_start_keyword,
         end_trial_at_keyword=end_trial_at_keyword,
@@ -1007,7 +1183,7 @@ def plotly_plot_with_image(
 
     if lines_in_plot == "Both":
         uncorrected_plot_mode = "markers+lines+text"
-        corrected_plot_mode = "markers+lines+text"
+        corrected_plot_mode = "markers+text"
 
     fig = go.Figure()
     fig.add_trace(
