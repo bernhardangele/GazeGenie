@@ -198,6 +198,7 @@ def calc_xdiff_ydiff(line_xcoords_no_pad, line_ycoords_no_pad, line_heights, all
 
 
 def add_words(chars_list):
+    
     chars_list_reconstructed = []
     words_list = []
     sentence_list = []
@@ -210,6 +211,21 @@ def add_words(chars_list):
     on_line_num = -1
     line_change_on_next_char = False
     num_chars = len(chars_list)
+    # Helper: is this char a sentence boundary?
+    def is_sentence_boundary(idx):
+        c = chars_list_reconstructed[idx]["char"]
+        if c not in ".!?":
+            return False
+        # Check if previous and next chars are digits (for numbers like 41.2)
+        prev_c = chars_list_reconstructed[idx-1]["char"] if idx > 0 else None
+        if prev_c == chars_list[idx-1]["char"]:
+            next_c = chars_list[idx+1]["char"] if idx+1 < len(chars_list) else None
+        if prev_c and prev_c.isdigit() and next_c and next_c.isdigit():
+            return False
+        # Optionally: only treat as boundary if followed by space or end
+        if next_c and next_c not in [None, " ", "\n"]:
+            return False
+        return True
     for idx, char_dict in enumerate(chars_list):
         # check if line change will happen after current char
         on_line_num = char_dict["assigned_line"]
@@ -222,23 +238,18 @@ def add_words(chars_list):
             word_xmin = chars_list_reconstructed[word_start_idx]["char_xmin"]
             if chars_list_reconstructed[-1]["char"] == " " and len(chars_list_reconstructed) != 1:
                 word_xmax = chars_list_reconstructed[-2]["char_xmax"]
-
-                word = "".join(
-                    [
-                        chars_list_reconstructed[idx]["char"]
-                        for idx in range(word_start_idx, len(chars_list_reconstructed) - 1)
-                    ]
-                )
+                word = "".join([
+                    chars_list_reconstructed[idx]["char"]
+                    for idx in range(word_start_idx, len(chars_list_reconstructed) - 1)
+                ])
             elif len(chars_list_reconstructed) == 1:
                 word_xmax = chars_list_reconstructed[-1]["char_xmax"]
                 word = " "
             else:
-                word = "".join(
-                    [
-                        chars_list_reconstructed[idx]["char"]
-                        for idx in range(word_start_idx, len(chars_list_reconstructed))
-                    ]
-                )
+                word = "".join([
+                    chars_list_reconstructed[idx]["char"]
+                    for idx in range(word_start_idx, len(chars_list_reconstructed))
+                ])
                 word_xmax = chars_list_reconstructed[-1]["char_xmax"]
             word_ymin = chars_list_reconstructed[word_start_idx]["char_ymin"]
             word_ymax = chars_list_reconstructed[word_start_idx]["char_ymax"]
@@ -269,10 +280,9 @@ def add_words(chars_list):
                     char_dict["in_word_number"] = len(words_list) - 1
                     char_dict["in_word"] = word
                     char_dict["num_letters_from_start_of_word"] = cidx
-
             word_start_idx = idx + 1
-
-        if chars_list_reconstructed[-1]["char"] in [".", "!", "?"] or idx == (len(chars_list) - 1):
+        # Improved sentence boundary detection
+        if is_sentence_boundary(len(chars_list_reconstructed)-1) or idx == (len(chars_list) - 1):
             if idx != sentence_start_idx:
                 chars_df_temp = pd.DataFrame(chars_list_reconstructed[sentence_start_idx:])
                 line_texts = []
@@ -301,7 +311,6 @@ def add_words(chars_list):
         ):
             char_dict["in_word_number"] = chars_list_reconstructed[cidx + 1]["in_word_number"]
             char_dict["in_word"] = chars_list_reconstructed[cidx + 1]["in_word"]
-
     last_letter_in_word = words_list[-1]["word"][-1]
     last_letter_in_chars_list_reconstructed = char_dict["char"]
     if last_letter_in_word != last_letter_in_chars_list_reconstructed:
@@ -316,7 +325,6 @@ def add_words(chars_list):
                 word_ymax=words_list[-1]["word_ymax"],
                 assigned_line=assigned_line,
             )
-
             word_x_center = round(
                 (words_list[-1]["word_xmax"] - words_list[-1]["word_xmin"]) / 2 + words_list[-1]["word_xmin"], ndigits=2
             )
@@ -347,7 +355,24 @@ def add_words(chars_list):
             chars_list_reconstructed[-1]["in_sentence"] = sentence_list[-1]["sentence_text"]
         else:
             ic(f"Warning Sentence list empty: {sentence_list}")
-
+    # Add 'in_sentence' and 'in_sentence_number' keys to words_list using 'in_word_number' from chars_list_reconstructed
+    # Build a mapping from in_word_number to (in_sentence, in_sentence_number)
+    word_to_sentence = {}
+    word_to_sentence_number = {}
+    for char in chars_list_reconstructed:
+        if "in_word_number" in char and "in_sentence" in char and "in_sentence_number" in char:
+            word_to_sentence[char["in_word_number"]] = char["in_sentence"]
+            word_to_sentence_number[char["in_word_number"]] = char["in_sentence_number"]
+    for word in words_list:
+        word_num = word.get("word_number")
+        if word_num in word_to_sentence:
+            word["in_sentence"] = word_to_sentence[word_num]
+        else:
+            word["in_sentence"] = None
+        if word_num in word_to_sentence_number:
+            word["in_sentence_number"] = word_to_sentence_number[word_num]
+        else:
+            word["in_sentence_number"] = None
     return words_list, chars_list_reconstructed
 
 
@@ -1520,6 +1545,7 @@ def download_example_ascs(EXAMPLES_FOLDER, EXAMPLES_ASC_ZIP_FILENAME, OSF_DOWNLA
                 ic(f"Extracting {EXAMPLES_ASC_ZIP_FILENAME} failed")
 
         EXAMPLE_ASC_FILES = [x for x in EXAMPLES_FOLDER_PATH.glob("*.asc")]
+   
     else:
         EXAMPLE_ASC_FILES = []
     return EXAMPLE_ASC_FILES

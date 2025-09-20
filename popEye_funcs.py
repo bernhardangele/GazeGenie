@@ -2,6 +2,7 @@
 Mostly adapted from: https://github.com/sascha2schroeder/popEye
 """
 
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 from icecream import ic
@@ -886,11 +887,13 @@ def combine_words(fix, wordfirst, wordtmp, algo_choice, measures_to_calculate):
 
 
 def compute_sentence_measures(fix, stimmat, algo_choice, measures_to_calc, save_to_csv=False):
-    sentitem = stimmat.drop_duplicates(
+    sentitem = deepcopy(stimmat).drop_duplicates(
         subset="in_sentence_number", keep="first"
     )  # TODO check why there are rows with sent number None
     fixin = fix.copy().reset_index(drop=True)
-
+    unique_trial_ids = fixin['trial_id'].unique()
+    if len(unique_trial_ids) == 1:
+        sentitem.loc[:,'trial_id'] = unique_trial_ids[0]
     fixin["on_sentence_num2"] = fixin[f"on_sentence_num_{algo_choice}"].copy()
 
     # Recompute sentence number (two fixation exception rule)
@@ -1146,6 +1149,7 @@ def compute_sentence_measures(fix, stimmat, algo_choice, measures_to_calc, save_
         item.rename({"in_sentence_number": f"on_sentence_num_{algo_choice}"}, axis=1),
         on=f"on_sentence_num_{algo_choice}",
         how="left",
+        suffixes=['','from_item']
     )
     sent[f"skip_{algo_choice}"] = 0
     sent.loc[pd.isna(sent[f"nrun_{algo_choice}"]), f"skip_{algo_choice}"] = 1

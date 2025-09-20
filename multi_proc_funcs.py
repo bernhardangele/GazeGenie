@@ -267,7 +267,7 @@ def set_up_models(dist_models_folder):
     out_dict = {}
     dist_models_with_norm = list(dist_models_folder.glob("*normalize_by_line_height_and_width_True*.ckpt"))
     dist_models_without_norm = list(dist_models_folder.glob("*normalize_by_line_height_and_width_False*.ckpt"))
-    DIST_MODEL_DATE_WITH_NORM = dist_models_with_norm[0].stem.split("_")[1]
+    dist_model_date_with_norm = dist_models_with_norm[0].stem.split("_")[1]
 
     models_without_norm_df = [find_and_load_model(m_file.stem.split("_")[1]) for m_file in dist_models_without_norm]
     models_with_norm_df = [find_and_load_model(m_file.stem.split("_")[1]) for m_file in dist_models_with_norm]
@@ -277,7 +277,10 @@ def set_up_models(dist_models_folder):
 
     models_without_norm_df = [x[0] for x in models_without_norm_df if x[0] is not None]
     models_with_norm_df = [x[0] for x in models_with_norm_df if x[0] is not None]
-
+    if len(models_without_norm_df) == 0:
+        ic("No models without normalization found")
+    if len(models_with_norm_df) == 0:
+        ic("No models with normalization found")
     ensemble_model_avg = models.EnsembleModel(
         models_without_norm_df, models_with_norm_df, learning_rate=0.0058, use_simple_average=True
     )
@@ -286,9 +289,11 @@ def set_up_models(dist_models_folder):
     out_dict["model_cfg_without_norm_df"] = model_cfg_without_norm_df
     out_dict["model_cfg_with_norm_df"] = model_cfg_with_norm_df
 
-    single_DIST_model, single_DIST_model_cfg = find_and_load_model(model_date=DIST_MODEL_DATE_WITH_NORM)
+    single_DIST_model, single_DIST_model_cfg = find_and_load_model(model_date=dist_model_date_with_norm)
     out_dict["single_DIST_model"] = single_DIST_model
     out_dict["single_DIST_model_cfg"] = single_DIST_model_cfg
+    if single_DIST_model is None:
+        ic(f"Failed to load single DIST model for {dist_model_date_with_norm}")
     return out_dict
 
 

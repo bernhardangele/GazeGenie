@@ -3,20 +3,28 @@ import pandas as pd
 import io
 import csv
 import os
+from pathlib import Path
 
 if os.environ.get('TESSDATA_PREFIX') is None and os.name == 'nt':
-    os.environ['TESSDATA_PREFIX'] = 'C:/Program Files/Tesseract-OCR/tessdata/'
     tessdata_prefix = 'C:/Program Files/Tesseract-OCR/tessdata/'
+    if Path(tessdata_prefix).exists():
+        os.environ['TESSDATA_PREFIX'] = 'C:/Program Files/Tesseract-OCR/tessdata/'
+    else:
+        tessdata_prefix = None
 if os.environ.get('TESSDATA_PREFIX') is None and os.name != 'nt':
-    tessdata_parent = next(os.walk("/usr/share/tesseract-ocr"))[1][0]
-    os.environ['TESSDATA_PREFIX'] = f'/usr/share/tesseract-ocr/{tessdata_parent}/tessdata'
-    tessdata_prefix = f'/usr/share/tesseract-ocr/{tessdata_parent}/tessdata'
+    tessdata_prefix = '/usr/share/tesseract-ocr/4.00/tessdata'
+    if Path(tessdata_prefix).exists():
+        os.environ['TESSDATA_PREFIX'] = '/usr/share/tesseract-ocr/4.00/tessdata'
+    else:
+        tessdata_prefix = None
     
 import pytesseract
 if os.name == 'nt':
-    pytesseract.pytesseract.tesseract_cmd = r'c:/Program Files/Tesseract-OCR/tesseract.exe'
+    if Path(r'c:/Program Files/Tesseract-OCR/tesseract.exe').exists():
+        pytesseract.pytesseract.tesseract_cmd = r'c:/Program Files/Tesseract-OCR/tesseract.exe'
 else:
-    pytesseract.pytesseract.tesseract_cmd =r'/usr/bin/tesseract'
+    if Path(r'/usr/bin/tesseract').exists():
+        pytesseract.pytesseract.tesseract_cmd =r'/usr/bin/tesseract'
 
 def recognize_text(image_path, tesseract_config='--psm 6 -l spa'):
     """

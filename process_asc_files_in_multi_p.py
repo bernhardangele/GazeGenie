@@ -1,5 +1,6 @@
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import json
+import logging
 from sys import platform as _platform
 from functools import partial
 import multiprocessing
@@ -10,6 +11,17 @@ import sys
 import pandas as pd
 
 
+logger = logging.getLogger('multiproc')
+logger.propagate = False
+logger.setLevel("DEBUG")
+ch = logging.FileHandler("MULTI_LOG.log", "a")
+ch.setFormatter(
+    logging.Formatter(
+        "%(asctime)s-{%(filename)s:%(lineno)d}-%(levelname)s >>> %(message)s",
+        "%m-%d %H:%M:%S",
+    )
+)
+logger.addHandler(ch)
 def get_cpu_count():
     if os.sys.platform in ("linux", "linux2", "darwin"):
         return os.cpu_count()
@@ -103,6 +115,7 @@ def main():
             models_dict,
             fix_cols_to_add_multi_asc,
         ) = json.loads(input_data)
+        logger.info("Finished loading from json")
         if (
             "DIST" in algo_choice
             or "Wisdom_of_Crowds_with_DIST" in algo_choice
@@ -133,16 +146,21 @@ def main():
             models_dict,
             fix_cols_to_add_multi_asc,
         )
+        logger.info("Finished process_asc_files_in_multi_proc")
         out2 = []
         for dffix, trial in out:
             dffix = dffix.to_dict("records")
             trial = make_json_compatible(trial)
             out2.append((dffix, trial))
         json_data_out = json.dumps(out2)
+        logger.info("Finished appending")
         sys.stdout.flush()
         print(json_data_out)
     except Exception as e:
+        logger.warning(e)
         print(json.dumps({"error": str(e)}))
+        with open("MULTI_ERROR.log",'w') as f:
+            f.write(e)
 
 
 if __name__ == "__main__":

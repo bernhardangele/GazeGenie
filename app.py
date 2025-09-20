@@ -21,8 +21,7 @@ import eyekit_measures as ekm
 import zipfile
 from matplotlib import font_manager
 import os
-LOGDIR = "logs"
-pl.Path(LOGDIR).mkdir(exist_ok=True)
+
 try:
     from create_interest_areas_from_image import recognize_text
 except Exception as e:
@@ -323,7 +322,7 @@ def create_logger(name, level="DEBUG", file=None):
 
 
 if "logger" not in st.session_state:
-    st.session_state["logger"] = create_logger(name="app", level="DEBUG", file=f"{LOGDIR}/log_for_app.log")
+    st.session_state["logger"] = create_logger(name="app", level="DEBUG", file="log_for_app.log")
 
 
 def add_fonts(font_dirs=["fonts"]):
@@ -1484,13 +1483,13 @@ def main():
             events_df_expander_single.markdown("### Fixations")
             events_df_expander_single.dataframe(
                 events_df[events_df["msg"] == "FIX"].dropna(how="all", axis=1).copy(),
-                use_container_width=True,
+                width='stretch',
                 height=200,
             )
             events_df_expander_single.markdown("### Saccades")
             events_df_expander_single.dataframe(
                 events_df[events_df["msg"] == "SAC"].dropna(how="all", axis=1).copy(),
-                use_container_width=True,
+                width='stretch',
                 height=200,
             )
             if not events_df[events_df["msg"] == "BLINK"].empty:
@@ -1499,7 +1498,7 @@ def main():
                 blinksdf = blinksdf.drop(
                     columns=[c for c in blinksdf.columns if c in ["blink", "blink_after", "blink_before"]]
                 )
-                events_df_expander_single.dataframe(blinksdf, use_container_width=True, height=200)
+                events_df_expander_single.dataframe(blinksdf, width='stretch', height=200)
             show_cleaning_options(single_file_tab_asc_tab, events_df[events_df["msg"] == "FIX"], "single_asc")
 
         if "dffix_cleaned_single_asc" in st.session_state and "trial_single_asc" in st.session_state:
@@ -1590,12 +1589,12 @@ def main():
                     chars_colnames_markdown = read_chars_col_names()
                     st.markdown(chars_colnames_markdown)
                 df_stim_expander_single.dataframe(
-                    pd.DataFrame(trial["chars_list"]), use_container_width=True, height=200
+                    pd.DataFrame(trial["chars_list"]), width='stretch', height=200
                 )
                 if "words_list" in trial:
                     df_stim_expander_single.markdown("### Words dataframe")
                     df_stim_expander_single.dataframe(
-                        pd.DataFrame(trial["words_list"]), use_container_width=True, height=200
+                        pd.DataFrame(trial["words_list"]), width='stretch', height=200
                     )
             else:
                 st.warning("🚨 No stimulus information in session state")
@@ -1683,7 +1682,7 @@ def main():
                         font=selected_plotting_font_single_asc,
                         lines_in_plot=lines_in_plot_single_asc,
                     ),
-                    use_container_width=False,
+                    width='content',
                 )
                 plot_expander_single.markdown("#### Saccades")
 
@@ -1713,11 +1712,11 @@ def main():
                         font=selected_plotting_font_single_asc,
                         lines_in_plot=lines_in_plot_single_asc,
                     ),
-                    use_container_width=False,
+                    width='content',
                 )
                 plot_expander_single.markdown("#### Y-coordinate correction due to line-assignment")
                 plot_expander_single.plotly_chart(
-                    plot_y_corr(dffix, st.session_state["algo_choice_single_asc"]), use_container_width=True
+                    plot_y_corr(dffix, st.session_state["algo_choice_single_asc"]), width='stretch'
                 )
             if "average_y_corrections" in trial:
                 plot_expander_single.markdown(
@@ -1823,7 +1822,7 @@ def main():
                             with open("word_measures.md", "r") as f:
                                 word_measure_colnames_markdown = "\n".join(f.readlines())
                             st.markdown(word_measure_colnames_markdown)
-                        st.dataframe(own_word_measures, use_container_width=True, hide_index=True, height=200)
+                        st.dataframe(own_word_measures, width='stretch', hide_index=True, height=200)
                         own_word_measures_csv = convert_df(own_word_measures)
                         subject = st.session_state["trial_single_asc"]["subject"]
                         trial_id = st.session_state["trial_single_asc"]["trial_id"]
@@ -1869,7 +1868,7 @@ def main():
                             st.markdown(sentence_measure_colnames_markdown)
                         st.dataframe(
                             st.session_state["own_sent_measures_single_asc"],
-                            use_container_width=True,
+                            width='stretch',
                             hide_index=True,
                             height=200,
                         )
@@ -1952,7 +1951,7 @@ def main():
                                 get_char_measures=False,
                             )
 
-                            st.dataframe(word_measures_df, use_container_width=True, hide_index=True, height=200)
+                            st.dataframe(word_measures_df, width='stretch', hide_index=True, height=200)
                             word_measures_df_csv = convert_df(word_measures_df)
 
                             st.download_button(
@@ -1976,7 +1975,7 @@ def main():
 
                             if character_measures_df is not None:
                                 st.dataframe(
-                                    character_measures_df, use_container_width=True, hide_index=True, height=200
+                                    character_measures_df, width='stretch', hide_index=True, height=200
                                 )
             else:
                 single_file_tab_asc_tab.warning("🚨 Stimulus information needed for analysis 🚨")
@@ -2007,7 +2006,7 @@ def main():
             accept_multiple_files=False,
             key="single_csv_file_stim_uploaded",
             type={"json", "csv", "txt", "dat","jpeg","png"},
-            help="Drag and drop or select a single .json, .csv, .txt, .dat, jpeg or png file that you wish to process as the stimulus file for the uploaded fixation data. If an image is uploaded OCR will be attempted to extract the character bounding boxes. This can be left blank if you chose to use the examples.",
+            help="Drag and drop or select a single .json, .csv, .txt, .dat, jpeg or png file that you wish to process as the stimulus file for the uploaded fixation data. If an image is uploaded OCR will be attempted to extract the character bounding boxes, note the filename MUST match the trial name for images(so for trial t1 the image MUST be called t1.png). This can be left blank if you chose to use the examples.",
         )
 
         st.checkbox(
@@ -2044,7 +2043,19 @@ def main():
         ]:
             if k in st.session_state:
                 del st.session_state[k]
-
+        def stringify_column_keep_decimal_if_needed(series):
+            try:
+                # Try to convert all values to float, then int
+                floats = series.astype(float)
+                ints = floats.astype(int)
+                # If all values are equal as int and float, drop decimals
+                if (floats == ints).all():
+                    return ints.astype(str)
+                else:
+                    return floats.astype(str)
+            except Exception:
+                # If conversion fails, fallback to original as string
+                return series.astype(str)
         if use_example_or_uploaded_file_choice != "Example Files":
             st.session_state["dffix_single_csv"] = load_csv_delim_agnostic(single_csv_file)
             st.session_state["dffix_col_mappings_guess_single_csv"] = find_col_name_suggestions(
@@ -2064,6 +2075,8 @@ def main():
             elif any([".png" in single_csv_stim_file.name, ".jpeg" in single_csv_stim_file.name]):
                 stimdf_single_csv = recognize_text(single_csv_stim_file)
                 stimdf_single_csv.to_csv(RESULTS_FOLDER / f"{single_csv_stim_file.name}_stimdf_single_from_OCR.csv")
+                if 'trial_id' in stimdf_single_csv.columns:
+                    stimdf_single_csv['trial_id'] = stimdf_single_csv['trial_id'].astype(str)
                 st.session_state["stimdf_single_csv"] = stimdf_single_csv
                 colnames_stim = st.session_state["stimdf_single_csv"].columns
             else:
@@ -2072,6 +2085,10 @@ def main():
             st.session_state["chars_df_col_mappings_guess_single_csv"] = find_col_name_suggestions(
                 list(colnames_stim), COLNAMES_CUSTOM_CSV_STIM
             )
+            for colname in COLNAME_CANDIDATES_CUSTOM_CSV_FIX['trial_id_col_name_fix']:
+                if colname in st.session_state["dffix_single_csv"].columns:
+                    st.session_state["dffix_single_csv"][colname] = stringify_column_keep_decimal_if_needed(st.session_state["dffix_single_csv"][colname])
+
         else:
             with open(EXAMPLE_CUSTOM_JSON_FILE, "r") as json_file:
                 json_string = json_file.read()
@@ -2087,7 +2104,7 @@ def main():
             if in_st_nn("dffix_single_csv"):
                 st.dataframe(
                     st.session_state["dffix_single_csv"],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     on_select="ignore",
                     height=200,
@@ -2098,7 +2115,7 @@ def main():
                 else:
                     st.dataframe(
                         st.session_state["stimdf_single_csv"],
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True,
                         on_select="ignore",
                         height=200,
@@ -2315,7 +2332,7 @@ def main():
             help="This downloads the corrected fixations dataframe as a .csv file with the filename containing the trial id.",
         )
         with single_file_tab_csv_tab.expander("Show corrected fixation data", expanded=True):
-            st.dataframe(dffix, use_container_width=True, hide_index=True, height=200)
+            st.dataframe(dffix, width='stretch', hide_index=True, height=200)
         with single_file_tab_csv_tab.expander("Show fixation plots", expanded=True):
 
             plotting_checkboxes_single_single_csv = st.multiselect(
@@ -2333,9 +2350,9 @@ def main():
                     to_plot_list=plotting_checkboxes_single_single_csv,
                     algo_choice=st.session_state["algo_choice_single_csv"],
                 ),
-                use_container_width=True,
+                width='stretch',
             )
-            st.plotly_chart(plot_y_corr(dffix, st.session_state["algo_choice_single_csv"]), use_container_width=True)
+            st.plotly_chart(plot_y_corr(dffix, st.session_state["algo_choice_single_csv"]), width='stretch')
             plotlist = [x for x in dffix.columns if "Unnamed" not in str(x)]
             plot_choice = st.multiselect(
                 "Which measures should be visualized?",
@@ -2343,7 +2360,7 @@ def main():
                 key="plot_choice_fix_measure",
                 default=plotlist[-1],
             )
-            st.plotly_chart(plot_fix_measure(dffix, plot_choice, "Index"), use_container_width=True)
+            st.plotly_chart(plot_fix_measure(dffix, plot_choice, "Index"), width='stretch')
 
         if "chars_list" in trial:
             analysis_expander_custom = single_file_tab_csv_tab.expander("Show Analysis results", True)
@@ -2420,7 +2437,7 @@ def main():
                     fixations_tuples, textblock_input_dict, trial=trial, get_char_measures=False
                 )
 
-                st.dataframe(word_measures_df, use_container_width=True, hide_index=True, height=200)
+                st.dataframe(word_measures_df, width='stretch', hide_index=True, height=200)
                 word_measures_df_csv = convert_df(word_measures_df)
 
                 st.download_button(
@@ -2436,7 +2453,7 @@ def main():
                 st.image(ekm.plot_with_measure(fixations_tuples, textblock_input_dict, screen_size, measure_words))
 
                 if character_measures_df is not None:
-                    st.dataframe(character_measures_df, use_container_width=True, hide_index=True, height=200)
+                    st.dataframe(character_measures_df, width='stretch', hide_index=True, height=200)
 
             with own_analysis_tab_custom:
                 st.markdown(
@@ -2451,8 +2468,18 @@ def main():
                     save_to_csv=True,
                     measures_to_calculate = ALL_MEASURES_OWN
                 )
-                st.dataframe(own_word_measures, use_container_width=True, hide_index=True, height=200)
+                st.dataframe(own_word_measures, width='stretch', hide_index=True, height=200)
                 own_word_measures_csv = convert_df(own_word_measures)
+
+                sent_measures_single_csv = compute_sentence_measures(
+                    dffix,
+                    pd.DataFrame(trial["chars_df"]),
+                    st.session_state["algo_choice_custom_eyekit"],
+                    ALL_SENT_MEASURES,
+                    save_to_csv=True,
+                )
+                st.session_state["own_sent_measures_single_csv"] = sent_measures_single_csv
+                st.dataframe(sent_measures_single_csv, width='stretch', hide_index=True, height=200)
 
                 st.download_button(
                     "⏬ Download word measures data",
@@ -2804,14 +2831,14 @@ def main():
         with multi_file_tab.popover("Column names definitions", help="Show column names and their definitions."):
             item_colnames_markdown = read_item_col_names()
             st.markdown(item_colnames_markdown)
-        multi_file_tab.dataframe(st.session_state["trials_df"], use_container_width=True, height=200)
+        multi_file_tab.dataframe(st.session_state["trials_df"], width='stretch', height=200)
         if in_st_nn("subjects_summary_df_multi_asc"):
             multi_file_tab.markdown("### Subject level summary statistics")
             with multi_file_tab.popover("Column names definitions", help="Show column names and their definitions."):
                 subject_measure_colnames_markdown = read_subject_meas_col_names()
                 st.markdown(subject_measure_colnames_markdown)
             multi_file_tab.dataframe(
-                st.session_state["subjects_summary_df_multi_asc"], use_container_width=True, height=200
+                st.session_state["subjects_summary_df_multi_asc"], width='stretch', height=200
             )
         if in_st_nn("trials_summary_df_multi_asc"):
             multi_file_tab.markdown("### Trial level summary statistics")
@@ -2819,14 +2846,14 @@ def main():
                 trials_colnames_markdown = read_trial_col_names()
                 st.markdown(trials_colnames_markdown)
             multi_file_tab.dataframe(
-                st.session_state["trials_summary_df_multi_asc"], use_container_width=True, height=200
+                st.session_state["trials_summary_df_multi_asc"], width='stretch', height=200
             )
 
         multi_file_tab.markdown("### Combined fixations dataframe and fixation level features")
         with multi_file_tab.popover("Column name definitions"):
             fix_colnames_markdown = get_fix_colnames_markdown()
             st.markdown(fix_colnames_markdown)
-        multi_file_tab.dataframe(st.session_state["all_fix_dfs_concat_multi_asc"], use_container_width=True, height=200)
+        multi_file_tab.dataframe(st.session_state["all_fix_dfs_concat_multi_asc"], width='stretch', height=200)
 
         high_fix_count_dfs = []
         for algo_choice in st.session_state["algo_choice_multi_asc"]:
@@ -2856,26 +2883,26 @@ def main():
             multi_file_tab.markdown(
                 "### Words that had a large number of fixations assigned to them and may need to be investigated"
             )
-            multi_file_tab.dataframe(high_fix_count_dfs_cat, use_container_width=True, height=200)
+            multi_file_tab.dataframe(high_fix_count_dfs_cat, width='stretch', height=200)
             subs_str = "-".join([s for s in st.session_state["all_trials_by_subj"].keys()])
             high_fix_count_dfs_cat.to_csv(RESULTS_FOLDER / f"{subs_str}_words_with_many_fixations.csv")
 
         if "all_correction_stats" in st.session_state:
             multi_file_tab.markdown("### Correction statistics")
-            multi_file_tab.dataframe(st.session_state["all_correction_stats"], use_container_width=True, height=200)
+            multi_file_tab.dataframe(st.session_state["all_correction_stats"], width='stretch', height=200)
         multi_file_tab.markdown("### Combined saccades dataframe and saccade level features")
         with multi_file_tab.popover("Column name definitions"):
             sac_colnames_markdown = get_sac_colnames_markdown()
             st.markdown(sac_colnames_markdown)
         multi_file_tab.dataframe(
-            st.session_state["all_sacc_dfs_concat_multi_asc"], use_container_width=True, height=200
+            st.session_state["all_sacc_dfs_concat_multi_asc"], width='stretch', height=200
         )
         multi_file_tab.markdown("### Combined characters dataframe")
         with multi_file_tab.popover("Column names definitions", help="Show column names and their definitions."):
             chars_colnames_markdown = read_chars_col_names()
             st.markdown(chars_colnames_markdown)
         multi_file_tab.dataframe(
-            st.session_state["all_chars_dfs_concat_multi_asc"], use_container_width=True, height=200
+            st.session_state["all_chars_dfs_concat_multi_asc"], width='stretch', height=200
         )
 
         if not st.session_state["all_own_word_measures_concat"].empty:
@@ -2884,7 +2911,7 @@ def main():
                 word_measure_colnames_markdown = read_word_meas_col_names()
                 st.markdown(word_measure_colnames_markdown)
             multi_file_tab.dataframe(
-                st.session_state["all_own_word_measures_concat"], use_container_width=True, height=200
+                st.session_state["all_own_word_measures_concat"], width='stretch', height=200
             )
         if not st.session_state["all_sentence_dfs_concat_multi_asc"].empty:
             multi_file_tab.markdown("### Combined sentence dataframe and sentence level features")
@@ -2892,7 +2919,7 @@ def main():
                 sentence_measure_colnames_markdown = read_sent_meas_col_names()
                 st.markdown(sentence_measure_colnames_markdown)
             multi_file_tab.dataframe(
-                st.session_state["all_sentence_dfs_concat_multi_asc"], use_container_width=True, height=200
+                st.session_state["all_sentence_dfs_concat_multi_asc"], width='stretch', height=200
             )
     if "zipfiles_with_results" in st.session_state:
         multi_res_col1, multi_res_col2 = multi_file_tab.columns(2)
@@ -2986,10 +3013,10 @@ def main():
                         to_plot_list=plotting_checkboxes_multi,
                         font=selecte_plotting_font_multi_asc,
                     ),
-                    use_container_width=True,
+                    width='stretch',
                 )
                 plot_expander_multi.plotly_chart(
-                    plot_y_corr(dffix_multi, st.session_state["algo_choice_multi_asc"]), use_container_width=True
+                    plot_y_corr(dffix_multi, st.session_state["algo_choice_multi_asc"]), width='stretch'
                 )
 
                 select_and_show_fix_sacc_feature_plots(
@@ -3061,7 +3088,7 @@ def main():
                         fixations_tuples, textblock_input_dict, trial=trial_multi, get_char_measures=False
                     )
 
-                    st.dataframe(word_measures_df, use_container_width=True, hide_index=True, height=200)
+                    st.dataframe(word_measures_df, width='stretch', hide_index=True, height=200)
                     word_measures_df_csv = convert_df(word_measures_df)
 
                     st.download_button(
@@ -3083,7 +3110,7 @@ def main():
                     st.image(ekm.plot_with_measure(fixations_tuples, textblock_input_dict, screen_size, measure_words))
 
                     if character_measures_df is not None:
-                        st.dataframe(character_measures_df, use_container_width=True, hide_index=True, height=200)
+                        st.dataframe(character_measures_df, width='stretch', hide_index=True, height=200)
 
                 with own_analysis_tab:
                     st.markdown(
@@ -3115,7 +3142,7 @@ def main():
                     own_word_measures = reorder_columns(own_word_measures)
                     if "question_correct" in own_word_measures.columns:
                         own_word_measures = own_word_measures.drop(columns=["question_correct"])
-                    st.dataframe(own_word_measures, use_container_width=True, hide_index=True, height=200)
+                    st.dataframe(own_word_measures, width='stretch', hide_index=True, height=200)
                     own_word_measures_csv = convert_df(own_word_measures)
                     st.download_button(
                         "⏬ Download word measures data",
@@ -3143,7 +3170,7 @@ def main():
                     )
                     st.pyplot(own_word_measures_fig)
                     st.markdown("Sentence measures")
-                    st.dataframe(sent_measures_multi, use_container_width=True, hide_index=True, height=200)
+                    st.dataframe(sent_measures_multi, width='stretch', hide_index=True, height=200)
 
             else:
                 multi_file_tab.warning("🚨 Stimulus information needed for analysis 🚨")
@@ -3686,7 +3713,7 @@ def select_and_show_fix_sacc_feature_plots(
                 x_axis_selection=st.session_state[plot_choice_fix_sac_feature_x_axis_name],
                 label_start="Fixation",
             ),
-            use_container_width=True,
+            width='stretch',
         )
         sacc_feature_plot_col_single_asc.plotly_chart(
             plot_fix_measure(
@@ -3695,7 +3722,7 @@ def select_and_show_fix_sacc_feature_plots(
                 x_axis_selection=st.session_state[plot_choice_fix_sac_feature_x_axis_name],
                 label_start="Saccade",
             ),
-            use_container_width=True,
+            width='stretch',
         )
 
 
