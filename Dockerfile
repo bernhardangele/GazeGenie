@@ -7,8 +7,8 @@ WORKDIR /app
 COPY . .
 RUN mkdir ./results
 
-RUN apt-get update && apt-get install -y \
-    build-essential curl software-properties-common git libcairo2-dev pkg-config python3-dev tesseract-ocr \
+RUN apt-get update && apt-get clean  && apt-get install -y \
+    build-essential curl git libcairo2-dev pkg-config python3-dev tesseract-ocr \
     && apt-get -y install tesseract-ocr-spa \ 
     && rm -rf /var/lib/apt/lists/*
 
