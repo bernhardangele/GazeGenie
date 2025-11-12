@@ -29,11 +29,19 @@ def fix_in_ia_default(fixation, ia_row, prefix):
     )
 
 
-def number_of_fixations_own(trial, dffix, prefix, correction_algo):
+def _get_interest_area_df(trial, prefix, ia_df=None):
+    """Return the interest-area dataframe, reusing a provided instance when available."""
+
+    if ia_df is not None:
+        return ia_df
+    return pd.DataFrame(trial[f"{prefix}s_list"])
+
+
+def number_of_fixations_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     Return the number of fixations on that interest area.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     counts = []
     for cidx, ia_row in ia_df.iterrows():
         count = 0
@@ -57,11 +65,11 @@ def number_of_fixations_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(counts)
 
 
-def initial_fixation_duration_own(trial, dffix, prefix, correction_algo):
+def initial_fixation_duration_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     The duration of the initial fixation on that interest area for each word.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     durations = []
 
     for cidx, ia_row in ia_df.iterrows():
@@ -81,8 +89,8 @@ def initial_fixation_duration_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(durations)
 
 
-def first_of_many_duration_own(trial, dffix, prefix, correction_algo):
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+def first_of_many_duration_own(trial, dffix, prefix, correction_algo, ia_df=None):
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     durations = []
     for cidx, ia_row in ia_df.iterrows():
         fixation_durations = []
@@ -111,11 +119,11 @@ def first_of_many_duration_own(trial, dffix, prefix, correction_algo):
         return pd.DataFrame()
 
 
-def total_fixation_duration_own(trial, dffix, prefix, correction_algo):
+def total_fixation_duration_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     sum duration of all fixations on that interest area.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     durations = []
     for cidx, ia_row in ia_df.iterrows():
         total_duration = 0
@@ -132,12 +140,12 @@ def total_fixation_duration_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(durations)
 
 
-def gaze_duration_own(trial, dffix, prefix, correction_algo):
+def gaze_duration_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     Gaze duration is the sum duration of all fixations
     inside an interest area until the area is exited for the first time.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     durations = []
     for cidx, ia_row in ia_df.iterrows():
         duration = 0
@@ -158,7 +166,7 @@ def gaze_duration_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(durations)
 
 
-def go_past_duration_own(trial, dffix, prefix, correction_algo):
+def go_past_duration_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     Given an interest area and fixation sequence, return the go-past time on
     that interest area. Go-past time is the sum duration of all fixations from
@@ -166,7 +174,7 @@ def go_past_duration_own(trial, dffix, prefix, correction_algo):
     the right, including any regressions to the left that occur during that
     time period (and vice versa in the case of right-to-left text).
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     results = []
 
     for cidx, ia_row in ia_df.iterrows():
@@ -190,12 +198,12 @@ def go_past_duration_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(results)
 
 
-def second_pass_duration_own(trial, dffix, prefix, correction_algo):
+def second_pass_duration_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     Given an interest area and fixation sequence, return the second pass
     duration on that interest area for each word.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     durations = []
 
     for cidx, ia_row in ia_df.iterrows():
@@ -224,13 +232,13 @@ def second_pass_duration_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(durations)
 
 
-def initial_landing_position_own(trial, dffix, prefix, correction_algo):
+def initial_landing_position_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     initial landing position (expressed in character positions) on that interest area.
     Counting is from 1. Returns `None` if no fixation
     landed on the interest area.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     if prefix == "word":
         chars_df = pd.DataFrame(trial[f"chars_list"])
     else:
@@ -266,7 +274,7 @@ def initial_landing_position_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(results)
 
 
-def initial_landing_distance_own(trial, dffix, prefix, correction_algo):
+def initial_landing_distance_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     Given an interest area and fixation sequence, return the initial landing
     distance on that interest area. The initial landing distance is the pixel
@@ -276,7 +284,7 @@ def initial_landing_distance_own(trial, dffix, prefix, correction_algo):
     without including any padding. Returns `None` if no fixation landed on the
     interest area.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     distances = []
     for cidx, ia_row in ia_df.iterrows():
         initial_distance = None
@@ -296,12 +304,12 @@ def initial_landing_distance_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(distances)
 
 
-def landing_distances_own(trial, dffix, prefix, correction_algo):
+def landing_distances_own(trial, dffix, prefix, correction_algo, ia_df=None):
     """
     Given an interest area and fixation sequence, return a dataframe with
     landing distances for each word in the interest area.
     """
-    ia_df = pd.DataFrame(trial[f"{prefix}s_list"])
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
     distances = []
     for cidx, ia_row in ia_df.iterrows():
         landing_distances = []
@@ -319,11 +327,15 @@ def landing_distances_own(trial, dffix, prefix, correction_algo):
     return pd.DataFrame(distances)
 
 
-def number_of_regressions_in_own(trial, dffix, prefix, correction_algo):
+def number_of_regressions_in_own(trial, dffix, prefix, correction_algo, ia_df=None):
+    ia_df = _get_interest_area_df(trial, prefix, ia_df)
+
+    if f"{prefix}_number" not in ia_df.columns:
+        ia_df = ia_df.reset_index().rename(columns={"index": f"{prefix}_number"})
+
     word_reg_in_count = (
-        dffix.groupby([f"on_{prefix}_number_{correction_algo}", f"on_{prefix}_{correction_algo}"])[
-            f"{prefix}_reg_in_{correction_algo}"
-        ]
+        dffix.groupby([f"on_{prefix}_number_{correction_algo}", f"on_{prefix}_{correction_algo}"])
+        [f"{prefix}_reg_in_{correction_algo}"]
         .sum()
         .reset_index()
         .rename(
@@ -335,4 +347,11 @@ def number_of_regressions_in_own(trial, dffix, prefix, correction_algo):
         )
     )
 
-    return word_reg_in_count
+    merged = ia_df[[f"{prefix}_number", prefix]].merge(
+        word_reg_in_count, how="left", on=[f"{prefix}_number", prefix]
+    )
+    merged[f"number_of_regressions_in_{correction_algo}"] = (
+        merged[f"number_of_regressions_in_{correction_algo}"].fillna(0).astype(int).tolist()
+    )
+
+    return merged

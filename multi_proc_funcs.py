@@ -16,6 +16,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Rectangle
 from tqdm.auto import tqdm
 import torch as t
+import logging
 t.classes.__path__ = [] # https://discuss.streamlit.io/t/error-in-torch-with-streamlit/90908/3
 import plotly.express as px
 import copy
@@ -30,6 +31,29 @@ import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system') # Needed to make multi proc not fail on linux
 
 ic.configureOutput(includeContext=True)
+
+LOGGER = logging.getLogger(__name__)
+
+def ensure_dataframe(obj, *, label="data", context: str | None = None):
+    if isinstance(obj, pd.DataFrame):
+        return obj
+    if obj is None:
+        parts = [f"{label} is missing"]
+        if context:
+            parts.append(f"({context})")
+        message = " ".join(parts) + "."
+        LOGGER.error(message)
+        raise ValueError(message)
+    return pd.DataFrame(obj)
+
+
+def _make_hashable(value):
+    if isinstance(value, list):
+        return tuple(_make_hashable(v) for v in value)
+    if isinstance(value, dict):
+        return tuple(sorted((k, _make_hashable(v)) for k, v in value.items()))
+    return value
+
 
 PLOTS_FOLDER = pl.Path("plots")
 event_strs = [
@@ -970,7 +994,7 @@ def get_raw_events_df_and_trial(trial, discard_fixations_without_sfix):
 
         if "index" not in chars_df.columns:
             chars_df.reset_index(inplace=True)
-        trial["chars_df"] = chars_df.to_dict()
+        trial["chars_df"] = chars_df
         trial["y_char_unique"] = list(chars_df.char_y_center.sort_values().unique())
     return reorder_columns(events_df), trial
 
@@ -1429,7 +1453,7 @@ def get_all_measures(
     for measure in measures_to_calculate:
         if hasattr(anf, f"{measure}_own"):
             function = getattr(anf, f"{measure}_own")
-            result = function(trial, dffix_copy, prefix, correction_algo)
+            result = function(trial, dffix_copy, prefix, correction_algo, stim_df)
             res_dfs.append(result)
     dfs_list = [df for df in [stim_df] + res_dfs if not df.empty]
     own_measure_df = stim_df
@@ -1478,6 +1502,12 @@ def get_all_measures(
         own_measure_df.to_csv(
             RESULTS_FOLDER / f"{trial['subject']}_{trial['trial_id']}_{correction_algo}_word_measures.csv"
         )
+
+    object_cols = own_measure_df.select_dtypes(include="object").columns
+    if len(object_cols) > 0:
+        for col in object_cols:
+            own_measure_df[col] = own_measure_df[col].map(_make_hashable)
+
     return own_measure_df
 
 
@@ -1838,7 +1868,7 @@ def get_DIST_preds(dffix, trial, models_dict):
         y_pred_DIST = [y_char_unique[idx] for idx in preds]
 
         dffix[f"line_num_{algo_choice}"] = preds
-        dffix[f"y_{algo_choice}"] = np.round(y_pred_DIST, decimals=2)
+        dffix[f"y_{algo_choice}"] = np.round(y_pred_DIST, decimals=0).astype(int).tolist()
         dffix[f"y_{algo_choice}_correction"] = (dffix.loc[:, f"y_{algo_choice}"] - dffix.loc[:, "y"]).round(2)
     except Exception as e:
         ic(f"Exception on model(batch) for DIST \n{e}")
@@ -1868,7 +1898,7 @@ def get_DIST_ensemble_preds(
     y_pred_DIST = [y_char_unique[idx] for idx in preds]
 
     dffix[f"line_num_{algo_choice}"] = preds
-    dffix[f"y_{algo_choice}"] = np.round(y_pred_DIST, decimals=1)
+    dffix[f"y_{algo_choice}"] = np.round(y_pred_DIST, decimals=0).astype(int).tolist()
     dffix[f"y_{algo_choice}_correction"] = (dffix.loc[:, f"y_{algo_choice}"] - dffix.loc[:, "y"]).round(1)
     return dffix
 
@@ -1989,7 +2019,7 @@ def add_popEye_cols_to_dffix(dffix, algo_choice, chars_df, trial, xcol, cols_to_
         dffix["angle_outgoing"] = angle_outgoing
     dffix[f"line_change_{algo_choice}"] = np.concatenate(
         ([0], np.diff(dffix[f"line_num_{algo_choice}"])), axis=0
-    ).astype(int)
+    ).astype(int).tolist()
 
     for i in list(dffix.index):
         if dffix.loc[i, f"line_num_{algo_choice}"] > -1 and not pd.isna(dffix.loc[i, f"line_num_{algo_choice}"]):
@@ -2161,10 +2191,20 @@ def correct_df(
         algo_choices = [algo_choice]
         repeats = range(1)
 
-    chars_df = pd.DataFrame(trial["chars_df"]) if "chars_df" in trial else pd.DataFrame(trial["chars_list"])
+    chars_df_source = trial.get("chars_df")
+    if chars_df_source is None:
+        chars_df_source = trial.get("chars_list")
+    trial_context = f"trial {trial.get('trial_id', 'unknown')}"
+    if trial.get("subject"):
+        trial_context = f"{trial.get('subject')} / {trial_context}"
+    chars_df = ensure_dataframe(
+        chars_df_source,
+        label="Character stimulus data",
+        context=trial_context,
+    )
     if for_multi:
         own_word_measures_dfs_for_algo = []
-        own_sentence_measures_dfs_for_algo = []
+    own_sentence_measures_dfs_for_algo = []
     trial["average_y_corrections"] = []
     for algoIdx in stqdm(repeats, desc="Applying line-assignment algorithms"):
         algo_choice = algo_choices[algoIdx]
@@ -2180,7 +2220,11 @@ def correct_df(
             fix_to_plot=["Uncorrected Fixations", "Corrected Fixations"],
             stim_info_to_plot=["Characters", "Word boxes"],
         )
-        savename = f"{trial['subject']}_{trial['trial_id']}_corr_{algo_choice}_fix.png"
+        subject_for_name = trial.get("subject") or (
+            pl.Path(trial["filename"]).stem if trial.get("filename") else "unknown_subject"
+        )
+        trial_id_for_name = trial.get("trial_id") or "unknown_trial"
+        savename = f"{subject_for_name}_{trial_id_for_name}_corr_{algo_choice}_fix.png"
         fig.savefig(RESULTS_FOLDER.joinpath(savename), dpi=300)
         plt.close(fig)
         dffix = add_popEye_cols_to_dffix(dffix, algo_choice, chars_df, trial, "x", cols_to_add=fix_cols_to_add)
@@ -2195,15 +2239,16 @@ def correct_df(
                 measures_to_calculate=measures_to_calculate_multi_asc,
                 include_coords=include_coords_multi_asc,
             )
+            if 'item' not in own_word_measures.columns:
+                add_cols_from_trial(trial, own_word_measures, cols=["item", "condition", "trial_id", "subject"])
             own_word_measures_dfs_for_algo.append(own_word_measures)
-            sent_measures_multi = pf.compute_sentence_measures(
-                dffix, pd.DataFrame(trial["chars_df"]), algo_choice, sent_measures_to_calc_multi
-            )
-            own_sentence_measures_dfs_for_algo.append(sent_measures_multi)
+            if sent_measures_to_calc_multi:
+                sent_measures_multi = pf.compute_sentence_measures(dffix, chars_df, algo_choice, sent_measures_to_calc_multi)
+                own_sentence_measures_dfs_for_algo.append(sent_measures_multi)
 
     if for_multi and len(own_word_measures_dfs_for_algo) > 0:
         words_df = (
-            pd.DataFrame(trial["chars_df"])
+            chars_df
             .drop_duplicates(subset="in_word_number", keep="first")
             .loc[:, ["in_word_number", "in_word"]]
             .rename({"in_word_number": "word_number", "in_word": "word"}, axis=1)
@@ -2222,41 +2267,53 @@ def correct_df(
             )
         words_df = reorder_columns(words_df, ["subject", "trial_id", "item", "condition", "word_number", "word"])
 
-        sentence_df = (
-            pd.DataFrame(trial["chars_df"])
-            .drop_duplicates(subset="in_sentence_number", keep="first")
-            .loc[
-                :,
-                [
-                    "in_sentence_number",
-                    "in_sentence",
-                ],
-            ]
-            .rename({"in_sentence_number": "sentence_number", "in_sentence": "sentence"}, axis=1)
-            .reset_index(drop=True)
-        )
-        add_cols_from_trial(trial, sentence_df, cols=["item", "condition", "trial_id", "subject"])
-        sentence_df["subject_trialID"] = [
-            f"{id}_{num}" for id, num in zip(sentence_df["subject"], sentence_df["trial_id"])
-        ]
-        sentence_df = sentence_df.merge(
-            own_sentence_measures_dfs_for_algo[0],
-            how="left",
-            on=["item", "condition", "trial_id", "subject", "sentence_number", "sentence"],
-        )
-        for sent_measure_df in own_sentence_measures_dfs_for_algo[1:]:
-            sentence_df = sentence_df.merge(
-                sent_measure_df,
-                how="left",
-                on=["subject", "trial_id", "item", "condition", "sentence_number", "sentence", "number_of_words"],
+        sentence_df = None
+        if own_sentence_measures_dfs_for_algo:
+            sentence_df = (
+                chars_df
+                .drop_duplicates(subset="in_sentence_number", keep="first")
+                .loc[
+                    :,
+                    [
+                        "in_sentence_number",
+                        "in_sentence",
+                    ],
+                ]
+                .rename({"in_sentence_number": "sentence_number", "in_sentence": "sentence"}, axis=1)
+                .reset_index(drop=True)
             )
-        sentence_df = reorder_columns(
-            sentence_df, ["subject", "trial_id", "item", "condition", "sentence_number", "sentence", "number_of_words"]
-        )
+            add_cols_from_trial(trial, sentence_df, cols=["item", "condition", "trial_id", "subject"])
+            sentence_df["subject_trialID"] = [
+                f"{id}_{num}" for id, num in zip(sentence_df["subject"], sentence_df["trial_id"])
+            ]
+            sentence_df = sentence_df.merge(
+                own_sentence_measures_dfs_for_algo[0],
+                how="left",
+                on=["item", "condition", "trial_id", "subject", "sentence_number", "sentence"],
+            )
+            for sent_measure_df in own_sentence_measures_dfs_for_algo[1:]:
+                sentence_df = sentence_df.merge(
+                    sent_measure_df,
+                    how="left",
+                    on=[
+                        "subject",
+                        "trial_id",
+                        "item",
+                        "condition",
+                        "sentence_number",
+                        "sentence",
+                        "number_of_words",
+                    ],
+                )
+            sentence_df = reorder_columns(
+                sentence_df,
+                ["subject", "trial_id", "item", "condition", "sentence_number", "sentence", "number_of_words"],
+            )
 
         trial["own_word_measures_dfs_for_algo"] = words_df
 
-        trial["own_sentence_measures_dfs_for_algo"] = sentence_df
+        if sentence_df is not None:
+            trial["own_sentence_measures_dfs_for_algo"] = sentence_df
     dffix = reorder_columns(dffix)
     if for_multi:
         return dffix
@@ -2313,10 +2370,25 @@ def process_trial_choice(
         merge_distance_threshold=merge_distance_threshold,
         discard_blinks=discard_blinks,
     )
-    if "chars_list" in trial:
-        chars_df = pd.DataFrame(trial["chars_df"])
+    if not trial.get("subject"):
+        filename = trial.get("filename")
+        if filename:
+            trial["subject"] = pl.Path(filename).stem
 
-        trial["chars_df"] = chars_df.to_dict()
+    if "chars_list" in trial:
+        chars_df_source = trial.get("chars_df")
+        if chars_df_source is None:
+            chars_df_source = trial.get("chars_list")
+        trial_context = f"trial {trial.get('trial_id', 'unknown')}"
+        if trial.get("subject"):
+            trial_context = f"{trial.get('subject')} / {trial_context}"
+        chars_df = ensure_dataframe(
+            chars_df_source,
+            label="Character stimulus data",
+            context=trial_context,
+        )
+
+        trial["chars_df"] = chars_df
         trial["y_char_unique"] = list(chars_df.char_y_center.sort_values().unique())
     if algo_choice is not None and ("chars_list" in trial or "words_list" in trial):
         if dffix.shape[0] > 1:
@@ -2335,10 +2407,14 @@ def process_trial_choice(
             )
 
             saccade_df = get_saccade_df(dffix, trial, algo_choice, trial.pop("events_df"))
-            trial["saccade_df"] = saccade_df.to_dict()
+            trial["saccade_df"] = saccade_df
 
             fig = plot_saccade_df(dffix, saccade_df, trial, True, False)
-            fig.savefig(RESULTS_FOLDER / f"{trial['subject']}_{trial['trial_id']}_saccades.png")
+            subject_for_name = trial.get("subject") or (
+                pl.Path(trial["filename"]).stem if trial.get("filename") else "unknown_subject"
+            )
+            trial_id_for_name = trial.get("trial_id") or "unknown_trial"
+            fig.savefig(RESULTS_FOLDER / f"{subject_for_name}_{trial_id_for_name}_saccades.png")
             plt.close(fig)
         else:
             ic(

@@ -1,6 +1,7 @@
 import pickle
 from io import StringIO
 import re
+import traceback
 from typing import Dict, List
 import zipfile
 import os
@@ -199,6 +200,9 @@ def calc_xdiff_ydiff(line_xcoords_no_pad, line_ycoords_no_pad, line_heights, all
 
 def add_words(chars_list):
     
+    if not chars_list:
+        return [], []
+    
     chars_list_reconstructed = []
     words_list = []
     sentence_list = []
@@ -222,8 +226,8 @@ def add_words(chars_list):
             next_c = chars_list[idx+1]["char"] if idx+1 < len(chars_list) else None
         if prev_c and prev_c.isdigit() and next_c and next_c.isdigit():
             return False
-        # Optionally: only treat as boundary if followed by space or end
-        if next_c and next_c not in [None, " ", "\n"]:
+        # Treat as boundary if followed by space, end, or an uppercase letter (for no-space cases like "one.Two")
+        if next_c and next_c not in [None, " ", "\n"] and not (next_c.isupper() and next_c.isalpha()):
             return False
         return True
     for idx, char_dict in enumerate(chars_list):
@@ -253,8 +257,8 @@ def add_words(chars_list):
                 word_xmax = chars_list_reconstructed[-1]["char_xmax"]
             word_ymin = chars_list_reconstructed[word_start_idx]["char_ymin"]
             word_ymax = chars_list_reconstructed[word_start_idx]["char_ymax"]
-            word_x_center = round((word_xmax - word_xmin) / 2 + word_xmin, ndigits=2)
-            word_y_center = chars_list_reconstructed[word_start_idx]["char_y_center"]
+            word_x_center = int(round((word_xmax - word_xmin) / 2 + word_xmin))
+            word_y_center = int(round((word_ymax - word_ymin) / 2 + word_ymin))
             word_length = len(word)
             assigned_line = int(chars_list_reconstructed[word_start_idx]["assigned_line"])
             word_dict = dict(
@@ -325,12 +329,12 @@ def add_words(chars_list):
                 word_ymax=words_list[-1]["word_ymax"],
                 assigned_line=assigned_line,
             )
-            word_x_center = round(
-                (words_list[-1]["word_xmax"] - words_list[-1]["word_xmin"]) / 2 + words_list[-1]["word_xmin"], ndigits=2
-            )
-            word_y_center = round(
-                (words_list[-1]["word_ymax"] - word_dict["word_ymin"]) / 2 + words_list[-1]["word_ymin"], ndigits=2
-            )
+            word_x_center = int(round(
+                (words_list[-1]["word_xmax"] - words_list[-1]["word_xmin"]) / 2 + words_list[-1]["word_xmin"]
+            ))
+            word_y_center = int(round(
+                (words_list[-1]["word_ymax"] - word_dict["word_ymin"]) / 2 + words_list[-1]["word_ymin"]
+            ))
             words_list[-1]["word_x_center"] = word_x_center
             words_list[-1]["word_y_center"] = word_y_center
         else:
@@ -414,14 +418,14 @@ def read_ias_file(ias_file, prefix):
     if words_include_spaces:
         ias_df[f"{prefix}_length"] = ias_df[prefix].map(lambda x: len(x) + 1)
         ias_df[f"{prefix}_width_per_length"] = ias_df[f"{prefix}_width"] / ias_df[f"{prefix}_length"]
-        ias_df[f"{prefix}_xmax"] = (ias_df[f"{prefix}_xmax"] - ias_df[f"{prefix}_width_per_length"]).round(2)
+        ias_df[f"{prefix}_xmax"] = [int(x) for x in (ias_df[f"{prefix}_xmax"] - ias_df[f"{prefix}_width_per_length"]).round(0)]
 
-    ias_df[f"{prefix}_x_center"] = (
+    ias_df[f"{prefix}_x_center"] = [int(x) for x in (
         (ias_df[f"{prefix}_xmax"] - ias_df[f"{prefix}_xmin"]) / 2 + ias_df[f"{prefix}_xmin"]
-    ).round(2)
-    ias_df[f"{prefix}_y_center"] = (
+    ).round(0)]
+    ias_df[f"{prefix}_y_center"] = [int(x) for x in (
         (ias_df[f"{prefix}_ymax"] - ias_df[f"{prefix}_ymin"]) / 2 + ias_df[f"{prefix}_ymin"]
-    ).round(2)
+    ).round(0)]
     unique_midlines = list(np.unique(ias_df[f"{prefix}_y_center"]))
     assigned_lines = [unique_midlines.index(x) for x in ias_df[f"{prefix}_y_center"]]
     ias_df["assigned_line"] = assigned_lines
@@ -440,41 +444,46 @@ def get_chars_list_from_words_list(ias_df, prefix="word"):
             char_dict = dict(
                 in_word_number=idx,
                 in_word=word,
-                char_xmin=round(row[f"{prefix}_xmin"] + i_w * letter_width, 2),
-                char_xmax=round(row[f"{prefix}_xmin"] + (i_w + 1) * letter_width, 2),
+                char_xmin=round(row[f"{prefix}_xmin"] + i_w * letter_width, 0),
+                char_xmax=round(row[f"{prefix}_xmin"] + (i_w + 1) * letter_width, 0),
                 char_ymin=row[f"{prefix}_ymin"],
                 char_ymax=row[f"{prefix}_ymax"],
                 char=letter,
             )
 
-            char_dict["char_x_center"] = round(
-                (char_dict["char_xmax"] - char_dict["char_xmin"]) / 2 + char_dict["char_xmin"], ndigits=2
-            )
-            char_dict["char_y_center"] = round(
-                (row[f"{prefix}_ymax"] - row[f"{prefix}_ymin"]) / 2 + row[f"{prefix}_ymin"], ndigits=2
-            )
+            char_dict["char_x_center"] = int(round(
+                (char_dict["char_xmax"] - char_dict["char_xmin"]) / 2 + char_dict["char_xmin"]
+            ))
+            char_dict["char_y_center"] = int(round(
+                (row[f"{prefix}_ymax"] - row[f"{prefix}_ymin"]) / 2 + row[f"{prefix}_ymin"]
+            ))
 
             if i_w >= len(word) + 1:
                 break
-            char_dict["assigned_line"] = unique_midlines.index(char_dict["char_y_center"])
+            try:
+                char_dict["assigned_line"] = unique_midlines.index(char_dict["char_y_center"])
+            except Exception as e:
+                ic(f"Error assigning line for char: {e}\n{traceback.format_exc()}")
             chars_list.append(char_dict)
         if chars_list[-1]["char"] != " " and row.assigned_line == next_row.assigned_line:
             char_dict = dict(
                 char_xmin=chars_list[-1]["char_xmax"],
-                char_xmax=round(chars_list[-1]["char_xmax"] + letter_width, 2),
+                char_xmax=round(chars_list[-1]["char_xmax"] + letter_width, 0),
                 char_ymin=row[f"{prefix}_ymin"],
                 char_ymax=row[f"{prefix}_ymax"],
                 char=" ",
             )
 
-            char_dict["char_x_center"] = round(
-                (char_dict["char_xmax"] - char_dict["char_xmin"]) / 2 + char_dict["char_xmin"], ndigits=2
-            )
-            char_dict["char_y_center"] = round(
-                (row[f"{prefix}_ymax"] - row[f"{prefix}_ymin"]) / 2 + row[f"{prefix}_ymin"], ndigits=2
-            )
-
-            char_dict["assigned_line"] = unique_midlines.index(char_dict["char_y_center"])
+            char_dict["char_x_center"] = int(round(
+                (char_dict["char_xmax"] - char_dict["char_xmin"]) / 2 + char_dict["char_xmin"]
+            ))
+            char_dict["char_y_center"] = int(round(
+                (row[f"{prefix}_ymax"] - row[f"{prefix}_ymin"]) / 2 + row[f"{prefix}_ymin"]
+            ))
+            try:
+                char_dict["assigned_line"] = unique_midlines.index(char_dict["char_y_center"])
+            except Exception as e:
+                ic(f"Error assigning line for space char: {e}\n{traceback.format_exc()}")
             chars_list.append(char_dict)
     chars_df = pd.DataFrame(chars_list)
     chars_df.loc[:, ["in_word_number", "in_word"]] = chars_df.loc[:, ["in_word_number", "in_word"]].copy().ffill(axis=0)
@@ -736,10 +745,10 @@ def asc_lines_to_trials_by_trail_id(
     if "question_correct" in trials_df.columns:
         paragraph_trials_df = trials_df.loc[trials_df.trial_is == "paragraph", :]
         overall_question_answer_value_counts = (
-            paragraph_trials_df["question_correct"].dropna().astype(int).value_counts().to_dict()
+            paragraph_trials_df["question_correct"].dropna().map(int).value_counts().to_dict()
         )
         overall_question_answer_value_counts_normed = (
-            paragraph_trials_df["question_correct"].dropna().astype(int).value_counts(normalize=True).to_dict()
+            paragraph_trials_df["question_correct"].dropna().map(int).value_counts(normalize=True).to_dict()
         )
     else:
         overall_question_answer_value_counts = None
@@ -841,12 +850,12 @@ def asc_lines_to_trials_by_trail_id(
                         "char_xmax": float(parts[rg_idx + 6 + idx_correction]),
                         "char_ymax": float(parts[rg_idx + 7 + idx_correction]),
                     }
-                    char_dict["char_y_center"] = round(
-                        (char_dict["char_ymax"] - char_dict["char_ymin"]) / 2 + char_dict["char_ymin"], ndigits=2
-                    )
-                    char_dict["char_x_center"] = round(
-                        (char_dict["char_xmax"] - char_dict["char_xmin"]) / 2 + char_dict["char_xmin"], ndigits=2
-                    )
+                    char_dict["char_y_center"] = int(round(
+                        (char_dict["char_ymax"] - char_dict["char_ymin"]) / 2 + char_dict["char_ymin"]
+                    ))
+                    char_dict["char_x_center"] = int(round(
+                        (char_dict["char_xmax"] - char_dict["char_xmin"]) / 2 + char_dict["char_xmin"]
+                    ))
                     chars_list.append(char_dict)
                 except Exception as e:
                     ic(f"char_dict creation failed for parts {parts}")
@@ -884,7 +893,7 @@ def asc_lines_to_trials_by_trail_id(
             for idx in range(len(chars_list)):
                 chars_list[idx]["char_y_center"] = round(
                     (chars_list[idx]["char_ymax"] - chars_list[idx]["char_ymin"]) / 2 + chars_list[idx]["char_ymin"],
-                    ndigits=2,
+                    ndigits=0,
                 )
                 if chars_list[idx]["char_y_center"] not in line_ycoords:
                     line_ycoords.append(chars_list[idx]["char_y_center"])

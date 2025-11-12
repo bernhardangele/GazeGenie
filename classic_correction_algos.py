@@ -58,7 +58,7 @@ def apply_classic_algo(
             corrected_fix_y_vals = compare(fixation_array, np.array(word_center_list), **algo_params)
         else:
             raise NotImplementedError(f"{algo} not implemented")
-    corrected_fix_y_vals = np.round(corrected_fix_y_vals, decimals=2)
+    corrected_fix_y_vals = np.round(corrected_fix_y_vals, decimals=0).astype(int).tolist()
     corrected_line_nums = [trial["y_char_unique"].index(y) for y in corrected_fix_y_vals]
     dffix[f"y_{algo}"] = corrected_fix_y_vals
     dffix[f"line_num_{algo}"] = corrected_line_nums

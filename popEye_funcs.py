@@ -1258,16 +1258,26 @@ def aggregate_trials(dffix_combined, wordcomb, all_trials_by_subj, algo_choices)
     trial = trial[names].copy()
 
     for index, row in trial.iterrows():
+        # Check if subject and trial exist in all_trials_by_subj
+        if row["subject"] not in all_trials_by_subj:
+            print(f"Warning: Subject '{row['subject']}' not found in all_trials_by_subj. Skipping trial {row['trial_id']}.")
+            continue
+        if row["trial_id"] not in all_trials_by_subj[row["subject"]]:
+            print(f"Warning: Trial '{row['trial_id']}' not found for subject '{row['subject']}'. Skipping.")
+            continue
+            
         selected_trial = all_trials_by_subj[row["subject"]][row["trial_id"]]
         info_keys = [
             k for k in selected_trial.keys() if k in ["trial_start_time", "trial_end_time", "question_correct"]
         ]
-        if row["subject"] in all_trials_by_subj and row["trial_id"] in all_trials_by_subj[row["subject"]]:
-            if selected_trial["Fixation Cleaning Stats"]["Discard fixation before or after blinks"]:
-                trial.at[index, "blink"] = selected_trial["Fixation Cleaning Stats"][
-                    "Number of discarded fixations due to blinks"
-                ]
-            for key, value in selected_trial.items():
+        
+        # Check if Fixation Cleaning Stats exists
+        if "Fixation Cleaning Stats" in selected_trial:
+            if selected_trial["Fixation Cleaning Stats"].get("Discard fixation before or after blinks", False):
+                trial.at[index, "blink"] = selected_trial["Fixation Cleaning Stats"].get(
+                    "Number of discarded fixations due to blinks", 0
+                )
+        for key, value in selected_trial.items():
                 if key in info_keys:
                     trial.at[index, key] = value
 
@@ -1349,10 +1359,45 @@ def aggregate_trials(dffix_combined, wordcomb, all_trials_by_subj, algo_choices)
 
 
 def aggregate_subjects(trials, algo_choices):
-    trial_aggregates = trials.groupby("subject")[["nfix", "blink"]].mean().round(3).reset_index()
-    trial_aggregates = trial_aggregates.merge(
-        trials.groupby("subject")["question_correct"].sum().reset_index(name="n_question_correct"), on="subject"
-    )
+    base_cols = [col for col in ["nfix", "blink"] if col in trials.columns]
+    if base_cols:
+        trial_aggregates = trials.groupby("subject")[base_cols].mean().round(3).reset_index()
+    else:
+        trial_aggregates = trials[["subject"]].drop_duplicates().reset_index(drop=True)
+
+    if "question_correct" in trials.columns:
+        qc_series = trials["question_correct"].copy()
+        if qc_series.dtype == "object":
+            qc_series = qc_series.replace(
+                {
+                    "True": True,
+                    "true": True,
+                    "FALSE": False,
+                    "False": False,
+                    "false": False,
+                    "TRUE": True,
+                    "": pd.NA,
+                    None: pd.NA,
+                }
+            )
+        try:
+            qc_boolean = qc_series.astype("boolean")
+        except (TypeError, ValueError):
+            qc_boolean = qc_series.apply(lambda x: bool(x) if pd.notna(x) else pd.NA).astype("boolean")
+        qc_int = qc_boolean.astype("Int64")
+        question_counts = (
+            qc_int.groupby(trials["subject"])
+            .sum(min_count=0)
+            .fillna(0)
+            .astype("Int64")
+            .rename("n_question_correct")
+            .reset_index()
+        )
+        trial_aggregates = trial_aggregates.merge(question_counts, on="subject", how="left")
+        trial_aggregates["n_question_correct"] = trial_aggregates["n_question_correct"].astype("Int64")
+    else:
+        trial_aggregates["n_question_correct"] = pd.Series(0, index=trial_aggregates.index, dtype="Int64")
+
     trial_aggregates = trial_aggregates.merge(
         trials.groupby("subject")["trial_id"].count().reset_index(name="ntrial"), on="subject"
     )
@@ -1371,7 +1416,8 @@ def aggregate_subjects(trials, algo_choices):
             ]
             if c in trials.columns
         ]
-        trial_aggregates_temp = trials.groupby("subject")[cols_to_do].mean().round(3).reset_index()
-        trial_aggregates = pd.merge(trial_aggregates, trial_aggregates_temp, how="left", on="subject")
+        if cols_to_do:
+            trial_aggregates_temp = trials.groupby("subject")[cols_to_do].mean().round(3).reset_index()
+            trial_aggregates = pd.merge(trial_aggregates, trial_aggregates_temp, how="left", on="subject")
 
     return trial_aggregates
