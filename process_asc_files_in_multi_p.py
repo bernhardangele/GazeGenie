@@ -5,7 +5,6 @@ from sys import platform as _platform
 from functools import partial
 import multiprocessing
 import os
-from tqdm.auto import tqdm
 from multi_proc_funcs import DIST_MODELS_FOLDER, process_trial_choice, set_up_models
 import sys
 import pandas as pd
