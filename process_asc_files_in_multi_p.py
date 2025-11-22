@@ -1,7 +1,5 @@
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import json
 import logging
-from sys import platform as _platform
 from functools import partial
 import multiprocessing
 import os

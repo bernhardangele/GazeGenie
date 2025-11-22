@@ -1,5 +1,6 @@
 import os
 import traceback
+from datetime import datetime
 if os.name == 'posix' and os.uname().sysname == "Darwin" and os.path.exists("/opt/homebrew/lib"):
     # Fix for macOS https://github.com/Kozea/CairoSVG/issues/354#issuecomment-1072905204
     from ctypes.macholib import dyld
@@ -434,6 +435,62 @@ def save_to_zips(folder, pattern, savename, delete_after_zip=False, required_str
     st.session_state["logger"].info(f"Done zipping for pattern {pattern}")
 
 
+def create_master_results_zipfile(
+    folder, 
+    individual_zips, 
+    master_zipname, 
+    file_type_prefix: str = "asc"
+):
+    """
+    Create a master zipfile containing both individual file zips and combined results in organized subfolders.
+    
+    Args:
+        folder: The results folder path
+        individual_zips: List of individual zipfile paths to include
+        master_zipname: Name for the master zipfile (e.g., 'all_asc_results_YYYYMMDD.zip')
+        file_type_prefix: Either 'asc' or 'csv' for logging purposes
+    
+    Returns:
+        Path to the created master zipfile
+    """
+    master_zip_path = folder.joinpath(master_zipname)
+    
+    st.session_state["logger"].info(f"Creating master {file_type_prefix} results zipfile: {master_zipname}")
+    
+    with zipfile.ZipFile(master_zip_path, mode="w") as master_archive:
+        # Add individual file zips to /individual/ subfolder
+        for individual_zip in individual_zips:
+            if os.path.exists(individual_zip):
+                individual_zip_path = pl.Path(individual_zip)
+                arcname = f"individual/{individual_zip_path.name}"
+                master_archive.write(individual_zip_path, arcname=arcname)
+                st.session_state["logger"].info(f"Added {individual_zip_path.name} to master zip at {arcname}")
+        
+        # Add combined result files to /combined/ subfolder
+        combined_patterns = [
+            "*_comb_fixations.csv",
+            "*_comb_saccades.csv",
+            "*_comb_chars.csv",
+            "*_comb_words.csv",
+            "*_comb_sentences.csv",
+            "*_comb_metadata.json",
+            "*_trials_summary.csv",
+            "*_subjects_summary.csv",
+        ]
+        
+        added_combined_files = set()
+        for pattern in combined_patterns:
+            for file_path in folder.glob(pattern):
+                if file_path.name not in added_combined_files:
+                    arcname = f"combined/{file_path.name}"
+                    master_archive.write(file_path, arcname=arcname)
+                    added_combined_files.add(file_path.name)
+                    st.session_state["logger"].info(f"Added {file_path.name} to master zip at {arcname}")
+    
+    st.session_state["logger"].info(f"Master {file_type_prefix} results zipfile created: {master_zip_path}")
+    return str(master_zip_path)
+
+
 def make_json_serializable(obj, _stats=None):
     """
     Recursively convert non-JSON-serializable objects to serializable types.
@@ -542,6 +599,7 @@ def call_subprocess(script_path, data):
         json_data_in = json.dumps(serializable_data)
 
         result = subprocess.run(["python", script_path], input=json_data_in, capture_output=True, text=True)
+        ic(result.stderr)
         st.session_state["logger"].info(f"Got result from call_subprocess with return code {result.returncode}")
         if result.stdout and "error" not in result.stdout[:9]:
             result_data = json.loads(result.stdout)
@@ -958,14 +1016,17 @@ def process_all_asc_files(
                 all_sentence_dfs_concat = all_sentence_dfs_concat.drop(columns="subject_trialID")
                 all_sentence_dfs_concat.to_csv(RESULTS_FOLDER / f"{savestring}_comb_sentences.csv")
 
-            for asc_file_stem in asc_files_so_far:
-                save_to_zips(
-                    RESULTS_FOLDER,
-                    f"*{asc_file_stem}*.csv",
-                    f"{asc_file_stem}.zip",
-                    delete_after_zip=False,
-                    required_string="_comb",
-                )
+            # Create master zipfile with organized subfolders
+            date_str = datetime.now().strftime("%Y%m%d")
+            master_zip_name = f"all_asc_results_{date_str}.zip"
+            master_zip_path = create_master_results_zipfile(
+                RESULTS_FOLDER,
+                zipfiles_with_results,
+                master_zip_name,
+                file_type_prefix="asc"
+            )
+            # Add master zip to the list for user download
+            zipfiles_with_results.append(master_zip_path)
         else:
             trials_summary = None
             subjects_summary = None
@@ -1443,14 +1504,17 @@ def process_all_csv_files(
                 all_sentence_dfs_concat = all_sentence_dfs_concat.drop(columns="subject_trialID")
             all_sentence_dfs_concat.to_csv(RESULTS_FOLDER / f"{savestring}_comb_sentences.csv")
 
-        for csv_file_stem in csv_files_so_far:
-            save_to_zips(
-                RESULTS_FOLDER,
-                f"*{csv_file_stem}*.csv",
-                f"{csv_file_stem}.zip",
-                delete_after_zip=False,
-                required_string="_comb",
-            )
+        # Create master zipfile with organized subfolders
+        date_str = datetime.now().strftime("%Y%m%d")
+        master_zip_name = f"all_customfile_results_{date_str}.zip"
+        master_zip_path = create_master_results_zipfile(
+            RESULTS_FOLDER,
+            zipfiles_with_results,
+            master_zip_name,
+            file_type_prefix="csv"
+        )
+        # Add master zip to the list for user download
+        zipfiles_with_results.append(master_zip_path)
 
     return (
         list_of_trial_lists,
