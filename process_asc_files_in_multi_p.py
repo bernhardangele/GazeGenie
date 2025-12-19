@@ -6,6 +6,7 @@ import os
 from multi_proc_funcs import DIST_MODELS_FOLDER, process_trial_choice, set_up_models
 import sys
 import pandas as pd
+import numpy as np
 
 
 logger = logging.getLogger('multiproc')
@@ -78,14 +79,35 @@ def process_asc_files_in_multi_proc(
 def make_json_compatible(obj):
     if isinstance(obj, dict):
         return {k: make_json_compatible(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
+    elif isinstance(obj, (list, tuple)):
         return [make_json_compatible(v) for v in obj]
     elif isinstance(obj, pd.DataFrame):
         return obj.to_dict(orient="records")
     elif isinstance(obj, pd.Series):
         return obj.to_dict()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return make_json_compatible(obj.tolist())
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
     else:
         return obj
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        return super(NpEncoder, self).default(obj)
 
 
 def main():
@@ -149,13 +171,13 @@ def main():
             dffix = dffix.to_dict("records")
             trial = make_json_compatible(trial)
             out2.append((dffix, trial))
-        json_data_out = json.dumps(out2)
+        json_data_out = json.dumps(out2, cls=NpEncoder)
         logger.info("Finished appending")
         sys.stdout.flush()
         print(json_data_out)
     except Exception as e:
         logger.warning(e)
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e)}, cls=NpEncoder))
         with open("MULTI_ERROR.log",'w') as f:
             f.write(e)
 

@@ -552,6 +552,8 @@ def make_json_serializable(obj, _stats=None):
     elif isinstance(obj, pd.Series):
         _stats['pandas_series'] += 1
         result = make_json_serializable(obj.tolist(), _stats)
+    elif isinstance(obj, pl.Path):
+        result = str(obj)
     elif isinstance(obj, pd.DataFrame):
         _stats['pandas_dataframe'] += 1
         result = make_json_serializable(obj.to_dict(orient='records'), _stats)
@@ -596,7 +598,7 @@ def call_subprocess(script_path, data):
                         f"{conversion_stats['fallback_none']} to None"
                     )
         
-        json_data_in = json.dumps(serializable_data)
+        json_data_in = json.dumps(serializable_data, cls=ut.NpEncoder)
 
         result = subprocess.run(["python", script_path], input=json_data_in, capture_output=True, text=True)
         ic(result.stderr)
@@ -2099,6 +2101,7 @@ def main():
             "trial_start_keyword_single_asc",
             "trial_end_keyword_single_asc",
             "close_gap_between_words_single_asc",
+            "close_gap_between_lines_single_asc",
             "paragraph_trials_only_single_asc",
             "discard_fixations_without_sfix_single_asc",
             "discard_far_out_of_text_fix_single_asc",
@@ -2123,7 +2126,7 @@ def main():
     if len(settings_to_save) > 0:
         single_file_tab_asc_tab.download_button(
             "⏬ Download all single .asc file settings as JSON",
-            json.dumps(settings_to_save),
+            json.dumps(settings_to_save, cls=ut.NpEncoder),
             "settings_to_save.json",
             "json",
             key="download_settings_to_save",
@@ -2268,7 +2271,7 @@ def main():
         for k, v in st.session_state["trials_dict_single_asc"].items():
             if not isinstance(v, dict):
                 trials_dict_for_showing[k] = v
-        single_file_tab_asc_tab.json(trials_dict_for_showing, expanded=False)
+        single_file_tab_asc_tab.json(ut.make_json_serializable(trials_dict_for_showing), expanded=False)
     if "trial_choices_single_asc" in st.session_state:
         single_file_tab_asc_tab.markdown("### Trial and algorithm selection")
         with single_file_tab_asc_tab.form(key="single_file_tab_asc_tab_trial_select_form"):
@@ -2314,7 +2317,7 @@ def main():
                     f'### Result dataframes for trial {st.session_state["trial_single_asc"]["trial_id"]}'
                 )
                 trial_expander_single = single_file_tab_asc_tab.expander("Show Trial Information", False)
-                trial_expander_single.json(filtered_trial, expanded=False)
+                trial_expander_single.json(ut.make_json_serializable(filtered_trial), expanded=False)
             events_df_expander_single = single_file_tab_asc_tab.expander("Show fixations and saccades before cleaning")
             events_df = st.session_state["events_df"].set_index("num").copy()
             events_df_expander_single.markdown("## Events before cleaning")
@@ -2390,7 +2393,7 @@ def main():
             filtered_trial = filter_trial_for_export(copy.deepcopy(trial))
             trial_expander_single = single_file_tab_asc_tab.expander("Show Trial Information", False)
             trial_expander_single.markdown(f'### Metadata for trial {trial["trial_id"]}')
-            trial_expander_single.json(filtered_trial, expanded=False)
+            trial_expander_single.json(ut.make_json_serializable(filtered_trial), expanded=False)
             if "saccade_df" not in st.session_state:
                 if st.session_state["dffix_single_asc"].shape[0] > 1:
                     saccade_df = get_saccade_df(
@@ -2464,7 +2467,7 @@ def main():
             )
             trial_expander_single.download_button(
                 "⏬ Download trial info as JSON",
-                json.dumps(filtered_trial),
+                json.dumps(filtered_trial, cls=ut.NpEncoder),
                 f'{filtered_trial["subject"]}_{filtered_trial["trial_id"]}.json',
                 "json",
                 key="download-trial_single_asc",
@@ -2791,7 +2794,7 @@ def main():
                                 "r",
                             ) as f:
                                 fixation_sequence_json = json.load(f)
-                            fixation_sequence_json_str = json.dumps(fixation_sequence_json)
+                            fixation_sequence_json_str = json.dumps(fixation_sequence_json, cls=ut.NpEncoder)
 
                             st.download_button(
                                 "⏬ Download fixations in eyekits format",
@@ -2804,7 +2807,7 @@ def main():
 
                             with open(f"results/textblock_eyekit_{subject}_{trial_id}.json", "r") as f:
                                 textblock_json = json.load(f)
-                            textblock_json_str = json.dumps(textblock_json)
+                            textblock_json_str = json.dumps(textblock_json, cls=ut.NpEncoder)
 
                             st.download_button(
                                 "⏬ Download stimulus in eyekits format",
@@ -2969,7 +2972,7 @@ def main():
                 )
             if in_st_nn("stimdf_single_csv"):
                 if ".json" in st.session_state["single_csv_file_stim"].name:
-                    st.json(st.session_state["stimdf_single_csv"], expanded=False)
+                    st.json(ut.make_json_serializable(st.session_state["stimdf_single_csv"]), expanded=False)
                 else:
                     st.dataframe(
                         st.session_state["stimdf_single_csv"],
@@ -3268,7 +3271,7 @@ def main():
 
                 with open(f'results/fixation_sequence_eyekit_{trial["trial_id"]}.json', "r") as f:
                     fixation_sequence_json = json.load(f)
-                fixation_sequence_json_str = json.dumps(fixation_sequence_json)
+                fixation_sequence_json_str = json.dumps(fixation_sequence_json, cls=ut.NpEncoder)
 
                 st.download_button(
                     "⏬ Download fixations in eyekits format",
@@ -3281,7 +3284,7 @@ def main():
 
                 with open(f'results/textblock_eyekit_{trial["trial_id"]}.json', "r") as f:
                     textblock_json = json.load(f)
-                textblock_json_str = json.dumps(textblock_json)
+                textblock_json_str = json.dumps(textblock_json, cls=ut.NpEncoder)
 
                 st.download_button(
                     "⏬ Download stimulus in eyekits format",
@@ -3397,7 +3400,7 @@ def main():
         if len(settings_to_save) > 0:
             st.download_button(
                 "⏬ Download all multi .asc file settings as JSON",
-                json.dumps(settings_to_save),
+                json.dumps(settings_to_save, cls=ut.NpEncoder),
                 "settings_to_save_multi_asc.json",
                 "json",
                 key="download_settings_to_save_multi_asc",
@@ -3756,7 +3759,7 @@ def main():
     if in_st_nn("all_fix_dfs_concat_multi_asc"):
         if "all_trials_by_subj" in st.session_state:
             multi_file_tab.markdown("### All meta data by subject and trial")
-            multi_file_tab.json(st.session_state["all_trials_by_subj"], expanded=False)
+            multi_file_tab.json(ut.make_json_serializable(st.session_state["all_trials_by_subj"]), expanded=False)
         multi_file_tab.markdown("### Item level stimulus overview")
         with multi_file_tab.popover("Column names definitions", help="Show column names and their definitions."):
             item_colnames_markdown = read_item_col_names()
@@ -4112,7 +4115,7 @@ def main():
     if in_st_nn("all_fix_dfs_concat_multi_csv"):
         if "all_trials_by_subj_csv" in st.session_state:
             multi_file_tab.markdown("### All meta data by subject and trial (CSV)")
-            multi_file_tab.json(st.session_state["all_trials_by_subj_csv"], expanded=False)
+            multi_file_tab.json(ut.make_json_serializable(st.session_state["all_trials_by_subj_csv"]), expanded=False)
         multi_file_tab.markdown("### Item level stimulus overview (CSV)")
         with multi_file_tab.popover("Column names definitions", help="Show column names and their definitions."):
             item_colnames_markdown = read_item_col_names()
@@ -4484,7 +4487,7 @@ def render_multi_trial_section(
         df_stim_expander.info("No stimulus information available for this trial.")
 
     filtered_trial = filter_trial_for_export(trial)
-    trial_info_expander.json(filtered_trial)
+    trial_info_expander.json(ut.make_json_serializable(filtered_trial))
 
     plot_expander = container.expander(f"Show corrected fixation plots{info_suffix}", True)
     show_plots_key = f"show_fix_sacc_plots_{suffix}"
@@ -4602,7 +4605,7 @@ def render_multi_trial_section(
 
             with open(f'results/fixation_sequence_eyekit_{trial["trial_id"]}.json', "r") as f:
                 fixation_sequence_json = json.load(f)
-            fixation_sequence_json_str = json.dumps(fixation_sequence_json)
+            fixation_sequence_json_str = json.dumps(fixation_sequence_json, cls=ut.NpEncoder)
 
             st.download_button(
                 "⏬ Download fixations in eyekits format",
@@ -4615,7 +4618,7 @@ def render_multi_trial_section(
 
             with open(f'results/textblock_eyekit_{trial["trial_id"]}.json', "r") as f:
                 textblock_json = json.load(f)
-            textblock_json_str = json.dumps(textblock_json)
+            textblock_json_str = json.dumps(textblock_json, cls=ut.NpEncoder)
 
             st.download_button(
                 "⏬ Download stimulus in eyekits format",
@@ -5141,7 +5144,7 @@ def show_cleaning_results(
                 st.pyplot(dffix_clean_fig)
             st.markdown("#### Fixations comparison before and after cleaning")
             if "Fixation Cleaning Stats" in trial:
-                st.json(trial["Fixation Cleaning Stats"])
+                st.json(ut.make_json_serializable(trial["Fixation Cleaning Stats"]))
         st.markdown("#### Cleaned fixations dataframe")
 
         st.dataframe(dffix_cleaned, height=200)

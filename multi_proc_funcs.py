@@ -2093,11 +2093,17 @@ def _convert_to_json(obj):
     if isinstance(obj, (int, float, str, bool)):
         return obj
     elif isinstance(obj, dict):
-        return {k: _convert_to_json(v) for k, v in obj.items()}
-    elif isinstance(obj, list) or isinstance(obj, tuple):
+        return {str(k): _convert_to_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
         return [_convert_to_json(item) for item in obj]
-    elif isinstance(obj, dict):
-        return {k: _convert_to_json(val) for k, val in obj.items()}
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return _convert_to_json(obj.tolist())
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
     elif hasattr(obj, "to_dict"):
         return _convert_to_json(obj.to_dict())
     elif hasattr(obj, "tolist"):
@@ -2105,7 +2111,25 @@ def _convert_to_json(obj):
     elif obj is None:
         return None
     else:
-        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+        try:
+            return str(obj)
+        except:
+            raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        if isinstance(obj, pl.Path):
+            return str(obj)
+        return super(NpEncoder, self).default(obj)
 
 
 def save_trial_to_json(trial, savename):
@@ -2117,7 +2141,7 @@ def save_trial_to_json(trial, savename):
             ic(f"Warning: Skipping non-serializable value for key '{key}' due to error: {e}")
 
     with open(savename, "w", encoding="utf-8") as f:
-        json.dump(filtered_trial, f, ensure_ascii=False, indent=4)
+        json.dump(filtered_trial, f, ensure_ascii=False, indent=4, cls=NpEncoder)
 
 
 def export_trial(trial: dict):

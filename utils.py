@@ -102,6 +102,56 @@ def download_url(url, target_filename):
                 return -1
 
 
+def make_json_serializable(obj):
+    """
+    Recursively convert non-JSON-serializable objects to serializable types.
+    """
+    if isinstance(obj, dict):
+        return {str(key): make_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [make_json_serializable(item) for item in obj]
+    elif isinstance(obj, set):
+        return [make_json_serializable(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return make_json_serializable(obj.tolist())
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    elif isinstance(obj, pd.Series):
+        return make_json_serializable(obj.tolist())
+    elif isinstance(obj, pd.DataFrame):
+        return make_json_serializable(obj.to_dict(orient="records"))
+    elif isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace")
+    elif isinstance(obj, pl.Path):
+        return str(obj)
+    elif isinstance(obj, (str, int, float, type(None))):
+        return obj
+    else:
+        try:
+            return str(obj)
+        except:
+            return None
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        if isinstance(obj, pl.Path):
+            return str(obj)
+        return super(NpEncoder, self).default(obj)
+
+
 def asc_to_trial_ids(
     asc_file, close_gap_between_words,close_gap_between_lines, paragraph_trials_only, ias_files, trial_start_keyword, end_trial_at_keyword
 ):
