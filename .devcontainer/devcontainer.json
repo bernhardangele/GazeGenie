@@ -23,5 +23,5 @@
 
   // Optional: Command to run when the container starts. 
   // If the app doesn't start automatically, you can add the start command here.
-  // "postStartCommand": "streamlit run app.py" 
+  "postStartCommand": "streamlit run app.py" 
 }
