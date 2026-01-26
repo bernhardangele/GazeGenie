@@ -1,27 +1,15 @@
 {
-  "name": "Gaze Genie App",
-  "image": "dockinthehubbing/gaze_genie:latest",
-
-  // Replicates -p 8501:8501
+  "name": "GazeGenie App",
+  "image": "bangele1/gazegenie:latest",
   "forwardPorts": [8501],
-
-  // Replicates -v $pwd/results:/app/results
   "mounts": [
     "source=${localWorkspaceFolder}/results,target=/app/results,type=bind"
   ],
-
-  // Optional: Customizations for VS Code (Extensions, Settings)
+  "postAttachCommand": "streamlit run app.py --server.port 8501 --server.address 0.0.0.0",
   "customizations": {
     "vscode": {
       "settings": {},
       "extensions": []
     }
-  },
-
-  // Keeps the container running so you can connect to it
-  "overrideCommand": true,
-
-  // Optional: Command to run when the container starts. 
-  // If the app doesn't start automatically, you can add the start command here.
-  "postStartCommand": "streamlit run app.py" 
+  }
 }
