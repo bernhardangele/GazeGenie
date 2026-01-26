@@ -21,7 +21,6 @@ import pathlib as pl
 import json
 import logging
 import zipfile
-from stqdm import stqdm
 import jellyfish as jf
 import shutil
 import eyekit_measures as ekm
@@ -702,12 +701,24 @@ def process_all_asc_files(
         list_of_trial_lists = []
         list_of_lines = []
         total_num_trials = 0
-        for asc_file in stqdm(asc_files_to_do, desc="Processing .asc files"):
+        
+        # Use st.progress for better stability with Streamlit reruns
+        progress_bar_asc = st.progress(0)
+        progress_text_asc = st.empty()
+        total_asc_files = len(asc_files_to_do)
+        
+        for asc_idx, asc_file in enumerate(asc_files_to_do):
+            # Update progress
+            progress = (asc_idx + 1) / total_asc_files if total_asc_files > 0 else 0
+            progress_bar_asc.progress(progress)
+            
             st.session_state["asc_file"] = asc_file
             if hasattr(asc_file, "name"):
                 asc_file_stem = pl.Path(asc_file.name).stem
             else:
                 asc_file_stem = pl.Path(asc_file).stem
+            
+            progress_text_asc.text(f"Processing .asc file {asc_idx + 1}/{total_asc_files}: {asc_file_stem}")
             asc_files_so_far.append(asc_file_stem)
             st.session_state["logger"].info(f"processing asc_file {asc_file_stem}")
             trial_choices_single_asc, trials_by_ids, lines, asc_file, trials_dict = ut.get_trials_list(
@@ -783,7 +794,19 @@ def process_all_asc_files(
                     models_dict = get_cached_models(DIST_MODELS_FOLDER)
                 dffixs = []
                 trials = []
-                for trial_id, trial in stqdm(trials_by_ids.items(), desc=f"\nProcessing trials in {asc_file_stem}"):
+                
+                # Use st.progress for better stability with Streamlit reruns
+                trials_list = list(trials_by_ids.items())
+                progress_bar_trials = st.progress(0)
+                progress_text_trials = st.empty()
+                total_trials = len(trials_list)
+                
+                for trial_idx, (trial_id, trial) in enumerate(trials_list):
+                    # Update progress
+                    progress = (trial_idx + 1) / total_trials if total_trials > 0 else 0
+                    progress_bar_trials.progress(progress)
+                    progress_text_trials.text(f"Processing trial {trial_idx + 1}/{total_trials} in {asc_file_stem}")
+                    
                     dffix, trial = process_trial_choice(
                         trial,
                         algo_choice_multi_asc,
@@ -807,8 +830,26 @@ def process_all_asc_files(
                     )
                     dffixs.append(dffix)
                     trials.append(trial)
+                
+                # Complete and clear progress bar for trials processing
+                progress_bar_trials.progress(1.0)
+                progress_text_trials.empty()
+                progress_bar_trials.empty()
+                
                 out = zip(dffixs, trials)
-            for dffix, trial in stqdm(out, desc=f"Aggregating results for file {asc_file_stem}"):
+            
+            # Convert zip to list for progress tracking
+            out_list = list(out)
+            progress_bar_agg = st.progress(0)
+            progress_text_agg = st.empty()
+            total_results = len(out_list)
+            
+            for result_idx, (dffix, trial) in enumerate(out_list):
+                # Update progress
+                progress = (result_idx + 1) / total_results if total_results > 0 else 0
+                progress_bar_agg.progress(progress)
+                progress_text_agg.text(f"Aggregating result {result_idx + 1}/{total_results} for {asc_file_stem}")
+                
                 if dffix.shape[0] < 2:
                     st.warning(
                         f"trial {trial_id} for file {asc_file_stem} failed because fixation dataframe only had {dffix.shape[0]} fixation after processing."
@@ -901,12 +942,24 @@ def process_all_asc_files(
                     export_dataframe(pd.DataFrame(trial["chars_list"]), csv_name)
                     ut.save_trial_to_json(trial_for_comb, RESULTS_FOLDER.joinpath(f"{asc_file_stem}_{trial_id}.json"))
 
+            # Complete and clear progress bar for aggregating results
+            progress_bar_agg.progress(1.0)
+            progress_text_agg.empty()
+            progress_bar_agg.empty()
+
             if os.path.exists(RESULTS_FOLDER.joinpath(f"{asc_file_stem}.zip")):
                 os.remove(RESULTS_FOLDER.joinpath(f"{asc_file_stem}.zip"))
             save_to_zips(RESULTS_FOLDER, f"*{asc_file_stem}*.csv", f"{asc_file_stem}.zip", delete_after_zip=True)
             save_to_zips(RESULTS_FOLDER, f"*{asc_file_stem}*.json", f"{asc_file_stem}.zip", delete_after_zip=True)
             save_to_zips(RESULTS_FOLDER, f"*{asc_file_stem}*.png", f"{asc_file_stem}.zip", delete_after_zip=True)
             zipfiles_with_results += [str(x) for x in RESULTS_FOLDER.glob(f"{asc_file_stem}*.zip")]
+        
+        # Complete and clear progress bar
+        progress_bar_asc.progress(1.0)
+        progress_text_asc.text(".asc processing complete!")
+        progress_bar_asc.empty()
+        progress_text_asc.empty()
+        
         if len(all_fix_dfs_list) == 0:
             st.warning("All .asc files failed")
             st.session_state["logger"].info("All .asc files failed")
@@ -1100,12 +1153,23 @@ def process_all_csv_files(
     )
     models_dict = get_cached_models(DIST_MODELS_FOLDER) if requires_models else {}
 
-    for csv_file in stqdm(csv_files, desc="Processing .csv files"):
+    # Use st.progress for better stability with Streamlit reruns
+    progress_bar = st.progress(0)
+    progress_text = st.empty()
+    total_csv_files = len(csv_files)
+    
+    for idx, csv_file in enumerate(csv_files):
+        # Update progress
+        progress = (idx + 1) / total_csv_files if total_csv_files > 0 else 0
+        progress_bar.progress(progress)
+        
         st.session_state["csv_file"] = csv_file
         if hasattr(csv_file, "name"):
             csv_file_stem = pl.Path(csv_file.name).stem
         else:
             csv_file_stem = pl.Path(str(csv_file)).stem
+        
+        progress_text.text(f"Processing .csv file {idx + 1}/{total_csv_files}: {csv_file_stem}")
         csv_files_so_far.append(csv_file_stem)
         st.session_state["logger"].info(f"processing csv_file {csv_file_stem}")
 
@@ -1365,6 +1429,12 @@ def process_all_csv_files(
         save_to_zips(RESULTS_FOLDER, f"*{csv_file_stem}*.json", f"{csv_file_stem}.zip", delete_after_zip=True)
         save_to_zips(RESULTS_FOLDER, f"*{csv_file_stem}*.png", f"{csv_file_stem}.zip", delete_after_zip=True)
         zipfiles_with_results += [str(x) for x in RESULTS_FOLDER.glob(f"{csv_file_stem}*.zip")]
+
+    # Complete and clear progress bar
+    progress_bar.progress(1.0)
+    progress_text.text("CSV processing complete!")
+    progress_bar.empty()
+    progress_text.empty()
 
     if len(all_fix_dfs_list) == 0:
         st.warning("All .csv files failed")
@@ -1771,7 +1841,19 @@ def get_fixations_file_trials_list(dffix, stimulus):
         dffix["trial_id"] = "trial_0"
     st.session_state["fixations_df"] = dffix
     trials_by_ids = {}
-    for trial_id, subdf in stqdm(enum, desc="Creating trials"):
+    
+    # Use st.progress for better stability with Streamlit reruns
+    enum_list = list(enum)
+    progress_bar_create = st.progress(0)
+    progress_text_create = st.empty()
+    total_enum = len(enum_list)
+    
+    for enum_idx, (trial_id, subdf) in enumerate(enum_list):
+        # Update progress
+        progress = (enum_idx + 1) / total_enum if total_enum > 0 else 0
+        progress_bar_create.progress(progress)
+        progress_text_create.text(f"Creating trial {enum_idx + 1}/{total_enum}")
+        
         if isinstance(stimulus, pd.DataFrame):
             stim_df = stimulus[stimulus.trial_id == subdf["trial_id"].iloc[0]]
             if stim_df.empty:
@@ -1814,6 +1896,11 @@ def get_fixations_file_trials_list(dffix, stimulus):
         trial["letter_width_avg"] = (chars_df["char_xmax"] - chars_df["char_xmin"]).mean()
         trial["plot_file"] = str(PLOTS_FOLDER.joinpath(f"{trial_id}_2ndInput_chars_channel_sep.png"))
         trials_by_ids[trial_id] = trial
+
+    # Complete and clear progress bar for creating trials
+    progress_bar_create.progress(1.0)
+    progress_text_create.empty()
+    progress_bar_create.empty()
 
     return trials_by_ids, trial_keys
 

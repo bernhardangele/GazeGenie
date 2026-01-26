@@ -2198,8 +2198,10 @@ def correct_df(
 ):
     if is_outside_of_streamlit:
         stqdm = tqdm
+        use_st_progress = False
     else:
-        from stqdm import stqdm
+        import streamlit as st
+        use_st_progress = True
 
     if isinstance(dffix, dict):
         dffix = dffix["value"]
@@ -2230,7 +2232,20 @@ def correct_df(
         own_word_measures_dfs_for_algo = []
     own_sentence_measures_dfs_for_algo = []
     trial["average_y_corrections"] = []
-    for algoIdx in stqdm(repeats, desc="Applying line-assignment algorithms"):
+    
+    # Use st.progress for better stability when inside Streamlit
+    if use_st_progress:
+        progress_bar_algo = st.progress(0)
+        progress_text_algo = st.empty()
+        total_algos = len(repeats)
+    
+    for algo_enum_idx, algoIdx in enumerate(repeats):
+        if use_st_progress:
+            # Update progress
+            progress = (algo_enum_idx + 1) / total_algos if total_algos > 0 else 0
+            progress_bar_algo.progress(progress)
+            progress_text_algo.text(f"Applying line-assignment algorithm {algo_enum_idx + 1}/{total_algos}")
+        
         algo_choice = algo_choices[algoIdx]
         dffix = apply_correction_algo(dffix, algo_choice, trial, models_dict, classic_algos_cfg)
         average_y_correction = (dffix[f"y_{algo_choice}"] - dffix["y"]).mean().round(1)
@@ -2269,6 +2284,12 @@ def correct_df(
             if sent_measures_to_calc_multi:
                 sent_measures_multi = pf.compute_sentence_measures(dffix, chars_df, algo_choice, sent_measures_to_calc_multi)
                 own_sentence_measures_dfs_for_algo.append(sent_measures_multi)
+
+    # Complete and clear progress bar for algorithm application
+    if use_st_progress:
+        progress_bar_algo.progress(1.0)
+        progress_text_algo.empty()
+        progress_bar_algo.empty()
 
     if for_multi and len(own_word_measures_dfs_for_algo) > 0:
         words_df = (
