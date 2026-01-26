@@ -709,7 +709,7 @@ def process_all_asc_files(
         
         for asc_idx, asc_file in enumerate(asc_files_to_do):
             # Update progress
-            progress = asc_idx / total_asc_files
+            progress = (asc_idx + 1) / total_asc_files
             progress_bar_asc.progress(progress)
             
             st.session_state["asc_file"] = asc_file
@@ -803,7 +803,7 @@ def process_all_asc_files(
                 
                 for trial_idx, (trial_id, trial) in enumerate(trials_list):
                     # Update progress
-                    progress = trial_idx / total_trials if total_trials > 0 else 0
+                    progress = (trial_idx + 1) / total_trials if total_trials > 0 else 0
                     progress_bar_trials.progress(progress)
                     progress_text_trials.text(f"Processing trial {trial_idx + 1}/{total_trials} in {asc_file_stem}")
                     
@@ -846,7 +846,7 @@ def process_all_asc_files(
             
             for result_idx, (dffix, trial) in enumerate(out_list):
                 # Update progress
-                progress = result_idx / total_results if total_results > 0 else 0
+                progress = (result_idx + 1) / total_results if total_results > 0 else 0
                 progress_bar_agg.progress(progress)
                 progress_text_agg.text(f"Aggregating result {result_idx + 1}/{total_results} for {asc_file_stem}")
                 
@@ -1161,7 +1161,7 @@ def process_all_csv_files(
     
     for idx, csv_file in enumerate(csv_files):
         # Update progress
-        progress = (idx) / total_csv_files
+        progress = (idx + 1) / total_csv_files
         progress_bar.progress(progress)
         
         st.session_state["csv_file"] = csv_file
@@ -1852,7 +1852,7 @@ def get_fixations_file_trials_list(dffix, stimulus):
     
     for enum_idx, (trial_id, subdf) in enumerate(enum_list):
         # Update progress
-        progress = enum_idx / total_enum if total_enum > 0 else 0
+        progress = (enum_idx + 1) / total_enum if total_enum > 0 else 0
         progress_bar_create.progress(progress)
         progress_text_create.text(f"Creating trial {enum_idx + 1}/{total_enum}")
         

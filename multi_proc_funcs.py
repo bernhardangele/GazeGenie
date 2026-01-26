@@ -2242,7 +2242,7 @@ def correct_df(
     for algoIdx in repeats:
         if use_st_progress:
             # Update progress
-            progress = algoIdx / total_algos if total_algos > 0 else 0
+            progress = (algoIdx + 1) / total_algos if total_algos > 0 else 0
             progress_bar_algo.progress(progress)
             progress_text_algo.text(f"Applying line-assignment algorithm {algoIdx + 1}/{total_algos}")
         
