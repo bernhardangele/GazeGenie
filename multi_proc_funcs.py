@@ -2239,12 +2239,12 @@ def correct_df(
         progress_text_algo = st.empty()
         total_algos = len(repeats)
     
-    for algoIdx in repeats:
+    for algo_enum_idx, algoIdx in enumerate(repeats):
         if use_st_progress:
             # Update progress
-            progress = (algoIdx + 1) / total_algos if total_algos > 0 else 0
+            progress = (algo_enum_idx + 1) / total_algos if total_algos > 0 else 0
             progress_bar_algo.progress(progress)
-            progress_text_algo.text(f"Applying line-assignment algorithm {algoIdx + 1}/{total_algos}")
+            progress_text_algo.text(f"Applying line-assignment algorithm {algo_enum_idx + 1}/{total_algos}")
         
         algo_choice = algo_choices[algoIdx]
         dffix = apply_correction_algo(dffix, algo_choice, trial, models_dict, classic_algos_cfg)

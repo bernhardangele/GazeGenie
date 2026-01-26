@@ -709,7 +709,7 @@ def process_all_asc_files(
         
         for asc_idx, asc_file in enumerate(asc_files_to_do):
             # Update progress
-            progress = (asc_idx + 1) / total_asc_files
+            progress = (asc_idx + 1) / total_asc_files if total_asc_files > 0 else 0
             progress_bar_asc.progress(progress)
             
             st.session_state["asc_file"] = asc_file
@@ -957,7 +957,6 @@ def process_all_asc_files(
         # Complete and clear progress bar
         progress_bar_asc.progress(1.0)
         progress_text_asc.text(".asc processing complete!")
-        time.sleep(0.5)  # Brief delay so user can see completion
         progress_bar_asc.empty()
         progress_text_asc.empty()
         
@@ -1161,7 +1160,7 @@ def process_all_csv_files(
     
     for idx, csv_file in enumerate(csv_files):
         # Update progress
-        progress = (idx + 1) / total_csv_files
+        progress = (idx + 1) / total_csv_files if total_csv_files > 0 else 0
         progress_bar.progress(progress)
         
         st.session_state["csv_file"] = csv_file
@@ -1434,7 +1433,6 @@ def process_all_csv_files(
     # Complete and clear progress bar
     progress_bar.progress(1.0)
     progress_text.text("CSV processing complete!")
-    time.sleep(0.5)  # Brief delay so user can see completion
     progress_bar.empty()
     progress_text.empty()
 
