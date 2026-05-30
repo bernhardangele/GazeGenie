@@ -15,6 +15,7 @@ GazeGenie is a Streamlit application for parsing, cleaning, correcting, visualiz
 3. If you are working with exported fixation tables plus stimulus files or images, use [`single-file-workflows.md`](single-file-workflows.md) for the custom-file workflow.
 4. Once your settings work on representative trials, move to [`batch-processing-and-outputs.md`](batch-processing-and-outputs.md).
 5. Use [`options-reference.md`](options-reference.md) whenever you need the exact current option names and supported values.
+6. For presentations, adapt [`gazegenie_workflow_poster_a1.typ`](gazegenie_workflow_poster_a1.typ) to generate a landscape DIN A1 poster with Typst.
 
 ## Recommended workflow
 
