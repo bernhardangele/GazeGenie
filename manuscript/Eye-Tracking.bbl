@@ -1,0 +1,86 @@
+\begin{thebibliography}{10}
+
+\bibitem{blytheVisualInformationCapture2009}
+H.~I. Blythe, S.~P. Liversedge, H.~S. S.~L. Joseph, S.~J. White, and K.~Rayner.
+\newblock Visual information capture during fixations in reading for children and adults.
+\newblock {\em Vision Research}, 49(12):1583--1591, June 2009.
+
+\bibitem{carrEyekit2019}
+J.~W. Carr.
+\newblock Eyekit.
+\newblock https://github.com/jwcarr/eyekit, Dec. 2019.
+
+\bibitem{carrAlgorithmsAutomatedCorrection2022}
+J.~W. Carr, V.~N. Pescuma, M.~Furlan, M.~Ktori, and D.~Crepaldi.
+\newblock Algorithms for the automated correction of vertical drift in eye-tracking data.
+\newblock {\em Behavior Research Methods}, 54(1):287--310, Feb. 2022.
+
+\bibitem{cohenSoftwareAutomaticCorrection2013}
+A.~L. Cohen.
+\newblock Software for the automatic correction of recorded eye fixation locations in reading experiments.
+\newblock {\em Behavior Research Methods}, 45(3):679--683, Sept. 2013.
+
+\bibitem{franzenIndividualsDyslexiaUse2021}
+L.~Franzen, Z.~Stark, and A.~P. Johnson.
+\newblock Individuals with dyslexia use a different visual sampling strategy to read text.
+\newblock {\em Scientific Reports}, 11(1):6449, Mar. 2021.
+
+\bibitem{glandorfSliceAlgorithmAssign2021}
+D.~Glandorf and S.~Schroeder.
+\newblock Slice: An algorithm to assign fixations in multi-line texts.
+\newblock {\em Procedia Computer Science}, 192:2971--2979, 2021.
+
+\bibitem{josephWordLengthLanding2009}
+H.~S. S.~L. Joseph, S.~P. Liversedge, H.~I. Blythe, S.~J. White, and K.~Rayner.
+\newblock Word length and landing position effects during reading in children and adults.
+\newblock {\em Vision Research}, 49(16):2078--2086, Aug. 2009.
+
+\bibitem{limasanchesVerticalErrorCorrection2016}
+C.~Lima~Sanches, O.~Augereau, and K.~Kise.
+\newblock Vertical error correction of eye trackers in nonrestrictive reading condition.
+\newblock {\em IPSJ Transactions on Computer Vision and Applications}, 8(1):7, Sept. 2016.
+
+\bibitem{mercierDualInputStream2024a}
+T.~M. Mercier, M.~Budka, M.~R. Vasilev, J.~A. Kirkby, B.~Angele, and T.~J. Slattery.
+\newblock Dual {{Input Stream Transformer}} for {{Vertical Drift Correction}} in {{Eye-tracking Reading Data}}.
+\newblock {\em IEEE Transactions on Pattern Analysis and Machine Intelligence}, pages 1--12, 2024.
+
+\bibitem{raynerEyeMovementsReading1998}
+K.~Rayner.
+\newblock Eye {{Movements}} in {{Reading}} and {{Information Processing}}: 20 {{Years}} of {{Research}}.
+\newblock {\em Psychological Bulletin}, 124(3):372--422, Nov. 1998.
+
+\bibitem{rayner35thSirFrederick2009}
+K.~Rayner.
+\newblock The 35th {{Sir Frederick Bartlett Lecture}}: {{Eye}} movements and attention in reading, scene perception, and visual search.
+\newblock {\em Quarterly Journal of Experimental Psychology}, 62(8):1457--1506, Aug. 2009.
+
+\bibitem{schroederPopEyePackageAnalyse2022}
+S.~Schroeder.
+\newblock {{popEye}} - {{An R}} package to analyse eye movement data from reading experiments, June 2022.
+
+\bibitem{slatteryEyemovementExplorationReturnsweep2019}
+T.~J. Slattery and M.~R. Vasilev.
+\newblock An eye-movement exploration into return-sweep targeting during reading.
+\newblock {\em Attention, Perception, \& Psychophysics}, 81(5):1197--1203, July 2019.
+
+\bibitem{stracuzziEyeDoctorSoftware2004}
+D.~J. Stracuzzi.
+\newblock {{EyeDoctor Software}}.
+\newblock University of Massachusetts, 2004.
+
+\bibitem{streamlitStreamlitFasterWay2021}
+Streamlit.
+\newblock Streamlit {$\bullet$} {{A}} faster way to build and share data apps.
+\newblock https://streamlit.io/, Jan. 2021.
+
+\bibitem{tiffin-richardsChildrenAdultsParafoveal2015}
+S.~P. {Tiffin-Richards} and S.~Schroeder.
+\newblock Children's and adults' parafoveal processes in {{German}}: {{Phonological}} and orthographic effects.
+\newblock {\em Journal of Cognitive Psychology}, 27(5):531--548, July 2015.
+
+\bibitem{vasilevMartinvasilevEMreading2023}
+M.~R. Vasilev.
+\newblock Martin-vasilev/{{EMreading}}, June 2023.
+
+\end{thebibliography}
